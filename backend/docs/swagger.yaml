@@ -1,0 +1,2443 @@
+basePath: /api/v1
+definitions:
+  admin.EnforceRequest:
+    properties:
+      duration_days:
+        type: integer
+      enforcement_type:
+        description: warning, temporary_restriction, temporary_block, permanent_block,
+          unblock
+        type: string
+      note:
+        type: string
+      reason:
+        type: string
+    required:
+    - enforcement_type
+    - reason
+    type: object
+  admin.ModerateRequest:
+    properties:
+      action:
+        description: approve, reject, request_changes, suspend
+        type: string
+      note:
+        type: string
+      reason:
+        type: string
+    required:
+    - action
+    type: object
+  admin.OverviewMetrics:
+    properties:
+      active_users:
+        type: integer
+      approved_listings:
+        type: integer
+      blocked_users:
+        type: integer
+      open_reports:
+        type: integer
+      pending_listings:
+        type: integer
+      pending_verifications:
+        type: integer
+      rejected_listings:
+        type: integer
+      total_listings:
+        type: integer
+      total_users:
+        type: integer
+    type: object
+  admin.ResolveReportRequest:
+    properties:
+      action:
+        description: resolve, dismiss
+        type: string
+      note:
+        type: string
+      reason:
+        type: string
+    required:
+    - action
+    type: object
+  admin.ReviewVerificationRequest:
+    properties:
+      action:
+        description: approve, reject, request_changes
+        type: string
+      note:
+        type: string
+      reason:
+        type: string
+    required:
+    - action
+    type: object
+  admin.RoleUpdateRequest:
+    properties:
+      role:
+        type: string
+    required:
+    - role
+    type: object
+  amenities.AmenitiesResponse:
+    properties:
+      categories:
+        items:
+          $ref: '#/definitions/amenities.AmenityCategoryResponse'
+        type: array
+      housing_type:
+        type: string
+    type: object
+  amenities.AmenityCategoryResponse:
+    properties:
+      amenities:
+        items:
+          $ref: '#/definitions/amenities.AmenityItem'
+        type: array
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+  amenities.AmenityItem:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+  auth.DevLoginIn:
+    properties:
+      first_name:
+        type: string
+      last_name:
+        type: string
+      phone:
+        type: string
+      role:
+        type: string
+    required:
+    - phone
+    type: object
+  auth.DevLoginOut:
+    properties:
+      access_token:
+        type: string
+      token_type:
+        type: string
+      user:
+        $ref: '#/definitions/auth.UserRead'
+    type: object
+  auth.ErrorResponse:
+    properties:
+      code:
+        example: VALIDATION_ERROR
+        type: string
+      details:
+        description: Details is present only for VALIDATION_ERROR responses.
+      message:
+        example: Human-readable error description.
+        type: string
+    type: object
+  auth.OTPRequestIn:
+    properties:
+      phone:
+        type: string
+      return_url:
+        type: string
+    required:
+    - phone
+    type: object
+  auth.OTPRequestOut:
+    properties:
+      challenge_id:
+        type: string
+      expires_in:
+        type: integer
+    type: object
+  auth.OTPVerifyIn:
+    properties:
+      challenge_id:
+        type: string
+      code:
+        type: string
+    required:
+    - challenge_id
+    - code
+    type: object
+  auth.OTPVerifyOut:
+    properties:
+      access_token:
+        type: string
+      is_new_user:
+        type: boolean
+      return_url:
+        type: string
+      token_type:
+        type: string
+    type: object
+  auth.ProfileCompleteRequest:
+    properties:
+      email:
+        maxLength: 255
+        type: string
+      first_name:
+        maxLength: 100
+        minLength: 1
+        type: string
+      last_name:
+        maxLength: 100
+        minLength: 1
+        type: string
+    required:
+    - first_name
+    - last_name
+    type: object
+  auth.RefreshOut:
+    properties:
+      access_token:
+        type: string
+      token_type:
+        type: string
+    type: object
+  auth.UserRead:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      first_name:
+        type: string
+      id:
+        type: string
+      last_name:
+        type: string
+      phone:
+        type: string
+      role:
+        $ref: '#/definitions/db.UserRole'
+      status:
+        $ref: '#/definitions/db.UserStatus'
+      updated_at:
+        type: string
+    type: object
+  db.AuditLog:
+    properties:
+      action:
+        type: string
+      admin_id:
+        type: string
+      admin_name:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      new_status:
+        type: string
+      note:
+        type: string
+      old_status:
+        type: string
+      reason:
+        type: string
+      target_id:
+        type: string
+      target_type:
+        type: string
+    type: object
+  db.Report:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      reason:
+        type: string
+      reporter_id:
+        type: string
+      resolution_note:
+        type: string
+      resolution_reason:
+        type: string
+      resolver_admin_id:
+        type: string
+      status:
+        type: string
+      target_id:
+        type: string
+      target_type:
+        description: listing, user
+        type: string
+      updated_at:
+        type: string
+    type: object
+  db.User:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      first_name:
+        type: string
+      id:
+        type: string
+      last_name:
+        type: string
+      phone:
+        type: string
+      role:
+        $ref: '#/definitions/db.UserRole'
+      status:
+        $ref: '#/definitions/db.UserStatus'
+      updated_at:
+        type: string
+    type: object
+  db.UserRole:
+    enum:
+    - guest
+    - host
+    - admin
+    type: string
+    x-enum-varnames:
+    - UserRoleGuest
+    - UserRoleHost
+    - UserRoleAdmin
+  db.UserStatus:
+    enum:
+    - pending_profile
+    - active
+    - suspended
+    - banned
+    type: string
+    x-enum-varnames:
+    - UserStatusPendingProfile
+    - UserStatusActive
+    - UserStatusSuspended
+    - UserStatusBanned
+  db.VerificationRequest:
+    properties:
+      admin_note:
+        type: string
+      created_at:
+        type: string
+      documents:
+        items:
+          type: integer
+        type: array
+      id:
+        type: string
+      legal_name:
+        type: string
+      provider_type:
+        description: individual, individual_entrepreneur, self_employed, legal_entity
+        type: string
+      rejection_reason:
+        type: string
+      requested_changes:
+        items:
+          type: integer
+        type: array
+      status:
+        type: string
+      unp:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  geo.GeoSuggestItem:
+    properties:
+      city:
+        type: string
+      country:
+        type: string
+      house_number:
+        type: string
+      latitude:
+        type: number
+      longitude:
+        type: number
+      raw_address:
+        type: string
+      street:
+        type: string
+    type: object
+  geo.GeoSuggestResponse:
+    properties:
+      results:
+        items:
+          $ref: '#/definitions/geo.GeoSuggestItem'
+        type: array
+    type: object
+  listings.DraftCreateRequest:
+    properties:
+      type:
+        type: string
+    required:
+    - type
+    type: object
+  listings.DraftCreateResponse:
+    properties:
+      current_step:
+        type: integer
+      draft_id:
+        type: string
+    type: object
+  listings.DraftDetailResponse:
+    properties:
+      allow_children:
+        type: boolean
+      allow_parties:
+        type: boolean
+      allow_pets:
+        type: boolean
+      allow_smoking:
+        type: boolean
+      amenities:
+        items:
+          type: string
+        type: array
+      bathrooms_count:
+        type: integer
+      beds_count:
+        type: integer
+      checkin_from:
+        type: string
+      checkout_until:
+        type: string
+      created_at:
+        type: string
+      currency:
+        type: string
+      current_step:
+        type: integer
+      deposit_required:
+        type: boolean
+      description:
+        type: string
+      floor:
+        type: integer
+      host_id:
+        type: string
+      id:
+        type: string
+      max_guests:
+        type: integer
+      media_ids:
+        items:
+          type: string
+        type: array
+      min_nights:
+        type: integer
+      name:
+        type: string
+      price_per_night:
+        type: number
+      rooms_count:
+        type: integer
+      square:
+        type: number
+      status:
+        type: string
+      total_floors:
+        type: integer
+      type:
+        type: string
+      updated_at:
+        type: string
+      with_invoicing:
+        type: boolean
+    type: object
+  listings.DraftStep2Request:
+    properties:
+      bathrooms_count:
+        maximum: 20
+        minimum: 1
+        type: integer
+      beds_count:
+        maximum: 30
+        minimum: 1
+        type: integer
+      floor:
+        maximum: 150
+        minimum: 1
+        type: integer
+      max_guests:
+        maximum: 50
+        minimum: 1
+        type: integer
+      name:
+        maxLength: 100
+        minLength: 10
+        type: string
+      rooms_count:
+        maximum: 30
+        minimum: 1
+        type: integer
+      square:
+        type: number
+      total_floors:
+        maximum: 150
+        minimum: 1
+        type: integer
+    required:
+    - bathrooms_count
+    - beds_count
+    - floor
+    - max_guests
+    - name
+    - rooms_count
+    - square
+    - total_floors
+    type: object
+  listings.DraftStep3Request:
+    properties:
+      media_ids:
+        items:
+          type: string
+        maxItems: 15
+        minItems: 5
+        type: array
+    required:
+    - media_ids
+    type: object
+  listings.DraftStep4Request:
+    properties:
+      amenities:
+        items:
+          type: string
+        minItems: 1
+        type: array
+    required:
+    - amenities
+    type: object
+  listings.DraftStep5Request:
+    properties:
+      checkin_from:
+        description: '"HH:MM" or "HH:MM:SS"'
+        type: string
+      checkout_until:
+        description: '"HH:MM" or "HH:MM:SS"'
+        type: string
+      currency:
+        type: string
+      min_nights:
+        maximum: 30
+        minimum: 1
+        type: integer
+      price_per_night:
+        type: number
+      rules:
+        $ref: '#/definitions/listings.ListingRules'
+    required:
+    - checkin_from
+    - checkout_until
+    - currency
+    - min_nights
+    - price_per_night
+    type: object
+  listings.DraftStep6Request:
+    properties:
+      description:
+        maxLength: 5000
+        minLength: 30
+        type: string
+    required:
+    - description
+    type: object
+  listings.DraftStepResponse:
+    properties:
+      current_step:
+        type: integer
+      draft_id:
+        type: string
+      status:
+        type: string
+    type: object
+  listings.HostSchema:
+    properties:
+      first_name:
+        type: string
+      id:
+        type: string
+      last_name:
+        type: string
+      name:
+        type: string
+      phone:
+        type: string
+      role:
+        type: string
+    type: object
+  listings.ListingHostReadSchema:
+    properties:
+      allow_children:
+        type: boolean
+      allow_parties:
+        type: boolean
+      allow_pets:
+        type: boolean
+      allow_smoking:
+        type: boolean
+      amenities:
+        items:
+          type: string
+        type: array
+      bathrooms_count:
+        type: integer
+      beds_count:
+        type: integer
+      checkin_from:
+        type: string
+      checkout_until:
+        type: string
+      created_at:
+        type: string
+      currency:
+        type: string
+      deposit_required:
+        type: boolean
+      description:
+        type: string
+      floor:
+        type: integer
+      id:
+        type: string
+      max_guests:
+        type: integer
+      media:
+        items:
+          type: string
+        type: array
+      min_nights:
+        type: integer
+      name:
+        type: string
+      price_per_night:
+        type: number
+      rooms_count:
+        type: integer
+      square:
+        type: number
+      status:
+        type: string
+      total_floors:
+        type: integer
+      type:
+        type: string
+      updated_at:
+        type: string
+      with_invoicing:
+        type: boolean
+    type: object
+  listings.ListingPublicSchema:
+    properties:
+      allow_children:
+        type: boolean
+      allow_parties:
+        type: boolean
+      allow_pets:
+        type: boolean
+      allow_smoking:
+        type: boolean
+      amenities:
+        items:
+          type: string
+        type: array
+      bathrooms_count:
+        type: integer
+      beds_count:
+        type: integer
+      checkin_from:
+        type: string
+      checkout_until:
+        type: string
+      created_at:
+        type: string
+      currency:
+        type: string
+      deposit_required:
+        type: boolean
+      description:
+        type: string
+      floor:
+        type: integer
+      host:
+        $ref: '#/definitions/listings.HostSchema'
+      id:
+        type: string
+      max_guests:
+        type: integer
+      media:
+        items:
+          type: string
+        type: array
+      min_nights:
+        type: integer
+      name:
+        type: string
+      price_per_night:
+        type: number
+      rooms_count:
+        type: integer
+      square:
+        type: number
+      total_floors:
+        type: integer
+      type:
+        type: string
+      with_invoicing:
+        type: boolean
+    type: object
+  listings.ListingRules:
+    properties:
+      allow_children:
+        type: boolean
+      allow_parties:
+        type: boolean
+      allow_pets:
+        type: boolean
+      allow_smoking:
+        type: boolean
+      deposit_required:
+        type: boolean
+      with_invoicing:
+        type: boolean
+    type: object
+  listings.ListingSubmitResponse:
+    properties:
+      listing_id:
+        type: string
+      status:
+        type: string
+    type: object
+  media.CompleteResponse:
+    properties:
+      file_key:
+        type: string
+      media_id:
+        type: string
+      status:
+        type: string
+    type: object
+  media.PresignRequest:
+    properties:
+      content_type:
+        type: string
+      file_size_bytes:
+        minimum: 1
+        type: integer
+    required:
+    - content_type
+    - file_size_bytes
+    type: object
+  media.PresignResponse:
+    properties:
+      expires_in:
+        type: integer
+      file_key:
+        type: string
+      media_id:
+        type: string
+      upload_url:
+        type: string
+    type: object
+  notifications.NotificationListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/notifications.NotificationRead'
+        type: array
+      total:
+        type: integer
+      unread_count:
+        type: integer
+    type: object
+  notifications.NotificationRead:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      is_read:
+        type: boolean
+      message:
+        type: string
+      payload:
+        items:
+          type: integer
+        type: array
+      read_at:
+        type: string
+      title:
+        type: string
+      type:
+        type: string
+      user_id:
+        type: string
+    type: object
+  notifications.SuccessResponse:
+    properties:
+      success:
+        type: boolean
+    type: object
+  notifications.UnreadCountResponse:
+    properties:
+      unread_count:
+        type: integer
+    type: object
+host: localhost:8000
+info:
+  contact:
+    email: dev@flickey.com
+    name: Flickey Dev Team
+  description: Property-rental platform backend. Provides OTP-based authentication,
+    multi-step listing wizard, media upload workflow, amenity catalogue, and an admin
+    moderation panel.
+  license:
+    name: MIT
+  termsOfService: http://flickey.com/terms/
+  title: Flickey Go API
+  version: "1.0"
+paths:
+  /admin/audit:
+    get:
+      description: Returns recent administrative audit log entries.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/db.AuditLog'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List audit logs
+      tags:
+      - Admin
+  /admin/listings:
+    get:
+      description: Returns a list of listings, optionally filtered by status.
+      parameters:
+      - description: Listing status filter (pending, active, rejected, suspended,
+          archived)
+        enum:
+        - pending
+        - active
+        - rejected
+        - suspended
+        - archived
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of listings with host details
+          schema:
+            items:
+              type: object
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List all listings
+      tags:
+      - Admin
+  /admin/listings/{id}:
+    get:
+      description: Returns full listing details for moderation.
+      parameters:
+      - description: Listing UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "400":
+          description: INVALID_ID
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "404":
+          description: LISTING_NOT_FOUND
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get listing details
+      tags:
+      - Admin
+  /admin/listings/{id}/moderate:
+    post:
+      consumes:
+      - application/json
+      description: Approve, reject, or suspend a listing. Transitions state and records
+        an audit log.
+      parameters:
+      - description: Listing UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Moderation action (approve/reject/request_changes/suspend) and
+          reason
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/admin.ModerateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "400":
+          description: VALIDATION_ERROR
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Moderate a listing
+      tags:
+      - Admin
+  /admin/overview:
+    get:
+      description: Returns counts of total users, listings, pending verifications,
+        active listings, etc.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/admin.OverviewMetrics'
+        "401":
+          description: MISSING_TOKEN / INVALID_TOKEN
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "403":
+          description: INSUFFICIENT_ROLE
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: INTERNAL_ERROR
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get admin overview metrics
+      tags:
+      - Admin
+  /admin/reports:
+    get:
+      description: Returns user/listing reports optionally filtered by status.
+      parameters:
+      - description: Report status filter (pending, resolved, dismissed)
+        enum:
+        - pending
+        - resolved
+        - dismissed
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/db.Report'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List reports
+      tags:
+      - Admin
+  /admin/reports/{id}/resolve:
+    post:
+      consumes:
+      - application/json
+      description: Marks a moderation report as resolved or dismissed, recording note
+        and reason.
+      parameters:
+      - description: Report UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Resolution action (resolve/dismiss) and details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/admin.ResolveReportRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/db.Report'
+        "400":
+          description: VALIDATION_ERROR / INVALID_ID
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Resolve or dismiss a report
+      tags:
+      - Admin
+  /admin/users:
+    get:
+      description: Returns a list of users, optionally filtered by role and status.
+      parameters:
+      - description: Filter by role
+        in: query
+        name: role
+        type: string
+      - description: Filter by status
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/db.User'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List users
+      tags:
+      - Admin
+  /admin/users/{id}:
+    get:
+      description: Returns a user's details and their listings.
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "400":
+          description: INVALID_ID
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "404":
+          description: USER_NOT_FOUND
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get user details
+      tags:
+      - Admin
+  /admin/users/{id}/enforce:
+    post:
+      consumes:
+      - application/json
+      description: Applies a warning, temporary block, or ban to a user. Records an
+        audit log.
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Enforcement action and reason
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/admin.EnforceRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/db.User'
+        "400":
+          description: VALIDATION_ERROR / INVALID_ID
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Enforce user restrictions
+      tags:
+      - Admin
+  /admin/users/{id}/role:
+    post:
+      consumes:
+      - application/json
+      description: Changes a user's role (guest, host, admin, moderator, support).
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Target user role
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/admin.RoleUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/db.User'
+        "400":
+          description: VALIDATION_ERROR / INVALID_ID
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update user role
+      tags:
+      - Admin
+  /admin/verification:
+    get:
+      description: Returns verification requests optionally filtered by status.
+      parameters:
+      - description: Verification status filter (pending, approved, rejected, changes_requested)
+        enum:
+        - pending
+        - approved
+        - rejected
+        - changes_requested
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/db.VerificationRequest'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List identity verification requests
+      tags:
+      - Admin
+  /admin/verification/{id}:
+    get:
+      description: Returns the details of a single verification request.
+      parameters:
+      - description: Verification request UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/db.VerificationRequest'
+        "400":
+          description: INVALID_ID
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "404":
+          description: VERIFICATION_NOT_FOUND
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get verification request details
+      tags:
+      - Admin
+  /admin/verification/{id}/review:
+    post:
+      consumes:
+      - application/json
+      description: Approves, rejects, or requests changes for a verification request.
+        Updates user status and logs audit entry.
+      parameters:
+      - description: Verification request UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Review action (approve/reject/request_changes) and reason
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/admin.ReviewVerificationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/db.VerificationRequest'
+        "400":
+          description: VALIDATION_ERROR / INVALID_ID
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Review identity verification request
+      tags:
+      - Admin
+  /amenities:
+    get:
+      description: Returns categorized amenities, optionally filtered for a specific
+        housing type (apartment, house, manor).
+      parameters:
+      - description: 'Filter by housing type: apartment, house, manor'
+        enum:
+        - apartment
+        - house
+        - manor
+        in: query
+        name: housing_type
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Categorized amenity catalogue
+          schema:
+            $ref: '#/definitions/amenities.AmenitiesResponse'
+        "400":
+          description: INVALID_HOUSING_TYPE
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      summary: Get amenity catalogue
+      tags:
+      - Amenities
+  /auth/complete-profile:
+    post:
+      consumes:
+      - application/json
+      description: Sets first name, last name, and optional email for a newly registered
+        user. Transitions status from pending_profile to active.
+      parameters:
+      - description: Profile fields (first_name and last_name required, email optional)
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.ProfileCompleteRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.UserRead'
+        "400":
+          description: VALIDATION_ERROR
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "401":
+          description: MISSING_TOKEN / INVALID_TOKEN / TOKEN_EXPIRED
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "409":
+          description: EMAIL_TAKEN – email already used by another account
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: INTERNAL_ERROR
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Complete user profile
+      tags:
+      - Auth
+  /auth/dev-login:
+    post:
+      consumes:
+      - application/json
+      description: Creates or finds a user by phone and returns tokens without OTP
+        verification. **Only available when ENVIRONMENT=dev.**
+      parameters:
+      - description: Phone and optional profile fields
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.DevLoginIn'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.DevLoginOut'
+        "400":
+          description: VALIDATION_ERROR
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "404":
+          description: NOT_FOUND – endpoint disabled in non-dev environments
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: INTERNAL_ERROR
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      summary: Dev-only instant login
+      tags:
+      - Auth
+  /auth/logout:
+    post:
+      description: Revokes the current refresh token and clears the HttpOnly cookie.
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "500":
+          description: INTERNAL_ERROR
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - CookieAuth: []
+      summary: Log out (current session)
+      tags:
+      - Auth
+  /auth/logout-all:
+    post:
+      description: Revokes all refresh tokens for the current user across all devices.
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: MISSING_TOKEN / INVALID_TOKEN
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: INTERNAL_ERROR
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Log out all sessions
+      tags:
+      - Auth
+  /auth/me:
+    get:
+      description: Returns the authenticated user's profile. Automatically promotes
+        guest → host if the user already has published listings.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.UserRead'
+        "401":
+          description: MISSING_TOKEN / INVALID_TOKEN / TOKEN_EXPIRED
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: INTERNAL_ERROR
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get current user
+      tags:
+      - Auth
+  /auth/refresh:
+    post:
+      description: Exchanges a valid refresh_token cookie (or Authorization header
+        in dev) for a new access token and rotates the refresh token.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.RefreshOut'
+        "401":
+          description: MISSING_REFRESH_TOKEN / TOKEN_EXPIRED / INVALID_TOKEN
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: INTERNAL_ERROR
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - CookieAuth: []
+      summary: Refresh access token
+      tags:
+      - Auth
+  /auth/request-otp:
+    post:
+      consumes:
+      - application/json
+      description: Sends a one-time password to the provided phone number and returns
+        a challenge ID used in the verify step.
+      parameters:
+      - description: Phone number (E.164) and optional return URL
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.OTPRequestIn'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.OTPRequestOut'
+        "400":
+          description: VALIDATION_ERROR – missing or invalid phone
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "429":
+          description: RATE_LIMIT_EXCEEDED – too many OTP requests
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: INTERNAL_ERROR
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      summary: Request an OTP code
+      tags:
+      - Auth
+  /auth/verify-otp:
+    post:
+      consumes:
+      - application/json
+      description: Validates the 6-digit OTP against the challenge ID. On success
+        issues an access token in the body and sets an HttpOnly refresh_token cookie.
+      parameters:
+      - description: Challenge ID and 6-digit OTP code
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.OTPVerifyIn'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: access_token (JWT bearer) + is_new_user flag
+          schema:
+            $ref: '#/definitions/auth.OTPVerifyOut'
+        "400":
+          description: VALIDATION_ERROR – missing fields or wrong OTP format
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "401":
+          description: INVALID_OTP / OTP_EXPIRED / CHALLENGE_NOT_FOUND
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "429":
+          description: RATE_LIMIT_EXCEEDED
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: INTERNAL_ERROR
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      summary: Verify OTP and authenticate
+      tags:
+      - Auth
+  /geo/suggest:
+    get:
+      description: Returns geocoded address suggestions and coordinates for a given
+        search query (proxied to Photon OSM with Redis caching).
+      parameters:
+      - description: Search query string (min 2 characters)
+        in: query
+        name: q
+        required: true
+        type: string
+      - description: 'Language code (default: ru)'
+        in: query
+        name: lang
+        type: string
+      - description: 'Max suggestions to return (default: 5, max: 10)'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/geo.GeoSuggestResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      summary: Address autocomplete suggestions
+      tags:
+      - Geo
+  /listings:
+    get:
+      description: Returns all currently published listings. No authentication required.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/listings.ListingPublicSchema'
+            type: array
+        "500":
+          description: INTERNAL_ERROR
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      summary: Browse published listings
+      tags:
+      - Listings
+  /listings/{listing_id}:
+    get:
+      description: Returns the public-facing details of a specific listing by UUID.
+        No authentication required.
+      parameters:
+      - description: Listing UUID
+        format: uuid
+        in: path
+        name: listing_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/listings.ListingPublicSchema'
+        "400":
+          description: INVALID_ID
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "404":
+          description: LISTING_NOT_FOUND
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: INTERNAL_ERROR
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      summary: Get a single published listing
+      tags:
+      - Listings
+  /listings/drafts:
+    post:
+      consumes:
+      - application/json
+      description: Initialises a new multi-step wizard draft with the property type.
+        Returns the draft ID and current step number.
+      parameters:
+      - description: Property type (apartment | house | manor)
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/listings.DraftCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/listings.DraftCreateResponse'
+        "400":
+          description: VALIDATION_ERROR
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "401":
+          description: MISSING_TOKEN / INVALID_TOKEN
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "403":
+          description: PROFILE_INCOMPLETE
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: INTERNAL_ERROR
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a new listing draft (step 1)
+      tags:
+      - Listings
+  /listings/drafts/{draft_id}:
+    get:
+      description: Fetches the full state of a listing draft. Only the owning host
+        can access it.
+      parameters:
+      - description: Draft UUID
+        format: uuid
+        in: path
+        name: draft_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/listings.DraftDetailResponse'
+        "400":
+          description: INVALID_ID
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "401":
+          description: MISSING_TOKEN / INVALID_TOKEN
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "403":
+          description: PROFILE_INCOMPLETE
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "404":
+          description: DRAFT_NOT_FOUND
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: INTERNAL_ERROR
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a draft
+      tags:
+      - Listings
+  /listings/drafts/{draft_id}/step-2:
+    patch:
+      consumes:
+      - application/json
+      description: 'Sets name, area, floor, guest count, rooms, beds, and bathrooms.
+        All fields required. name: 10–100 chars; square: 10–1000 m²; floor/total_floors:
+        1–150; max_guests: 1–50; rooms/beds: 1–30; bathrooms: 1–20.'
+      parameters:
+      - description: Draft UUID
+        format: uuid
+        in: path
+        name: draft_id
+        required: true
+        type: string
+      - description: Property details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/listings.DraftStep2Request'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/listings.DraftStepResponse'
+        "400":
+          description: VALIDATION_ERROR / INVALID_STEP_TRANSITION
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "401":
+          description: MISSING_TOKEN / INVALID_TOKEN
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "403":
+          description: PROFILE_INCOMPLETE
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "404":
+          description: DRAFT_NOT_FOUND
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: INTERNAL_ERROR
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update draft – step 2 (property details)
+      tags:
+      - Listings
+  /listings/drafts/{draft_id}/step-3:
+    patch:
+      consumes:
+      - application/json
+      description: Attaches 5–15 uploaded media UUIDs to the draft. All referenced
+        media must belong to the current user and be in uploaded status.
+      parameters:
+      - description: Draft UUID
+        format: uuid
+        in: path
+        name: draft_id
+        required: true
+        type: string
+      - description: Array of media UUIDs (5–15 items)
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/listings.DraftStep3Request'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/listings.DraftStepResponse'
+        "400":
+          description: VALIDATION_ERROR / INVALID_STEP_TRANSITION
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "401":
+          description: MISSING_TOKEN / INVALID_TOKEN
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "403":
+          description: PROFILE_INCOMPLETE / MEDIA_NOT_OWNED
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "404":
+          description: DRAFT_NOT_FOUND
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: INTERNAL_ERROR
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update draft – step 3 (media)
+      tags:
+      - Listings
+  /listings/drafts/{draft_id}/step-4:
+    patch:
+      consumes:
+      - application/json
+      description: Attaches one or more amenity IDs from the amenity registry to the
+        draft.
+      parameters:
+      - description: Draft UUID
+        format: uuid
+        in: path
+        name: draft_id
+        required: true
+        type: string
+      - description: Array of amenity ID strings (at least 1)
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/listings.DraftStep4Request'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/listings.DraftStepResponse'
+        "400":
+          description: VALIDATION_ERROR / INVALID_STEP_TRANSITION
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "401":
+          description: MISSING_TOKEN / INVALID_TOKEN
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "403":
+          description: PROFILE_INCOMPLETE
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "404":
+          description: DRAFT_NOT_FOUND
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: INTERNAL_ERROR
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update draft – step 4 (amenities)
+      tags:
+      - Listings
+  /listings/drafts/{draft_id}/step-5:
+    patch:
+      consumes:
+      - application/json
+      description: Sets price per night, currency, minimum nights, check-in/check-out
+        times (HH:MM format), and house rules (allow_children, allow_pets, allow_smoking,
+        allow_parties, deposit_required, with_invoicing).
+      parameters:
+      - description: Draft UUID
+        format: uuid
+        in: path
+        name: draft_id
+        required: true
+        type: string
+      - description: Pricing and house rules
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/listings.DraftStep5Request'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/listings.DraftStepResponse'
+        "400":
+          description: VALIDATION_ERROR / INVALID_STEP_TRANSITION
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "401":
+          description: MISSING_TOKEN / INVALID_TOKEN
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "403":
+          description: PROFILE_INCOMPLETE
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "404":
+          description: DRAFT_NOT_FOUND
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: INTERNAL_ERROR
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update draft – step 5 (pricing & rules)
+      tags:
+      - Listings
+  /listings/drafts/{draft_id}/step-6:
+    patch:
+      consumes:
+      - application/json
+      description: Sets the free-text description for the listing. 30–5000 characters.
+      parameters:
+      - description: Draft UUID
+        format: uuid
+        in: path
+        name: draft_id
+        required: true
+        type: string
+      - description: Description text
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/listings.DraftStep6Request'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/listings.DraftStepResponse'
+        "400":
+          description: VALIDATION_ERROR / INVALID_STEP_TRANSITION
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "401":
+          description: MISSING_TOKEN / INVALID_TOKEN
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "403":
+          description: PROFILE_INCOMPLETE
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "404":
+          description: DRAFT_NOT_FOUND
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: INTERNAL_ERROR
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update draft – step 6 (description)
+      tags:
+      - Listings
+  /listings/drafts/{draft_id}/submit:
+    post:
+      description: Finalises a completed 6-step draft and creates a published listing
+        pending moderation. Requires the Idempotency-Key header (UUIDv4) to prevent
+        duplicate submissions.
+      parameters:
+      - description: Draft UUID
+        format: uuid
+        in: path
+        name: draft_id
+        required: true
+        type: string
+      - description: Client-generated UUIDv4 idempotency key
+        format: uuid
+        in: header
+        name: Idempotency-Key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/listings.ListingSubmitResponse'
+        "400":
+          description: MISSING_IDEMPOTENCY_KEY / INVALID_IDEMPOTENCY_KEY / DRAFT_INCOMPLETE
+            / VALIDATION_ERROR
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "401":
+          description: MISSING_TOKEN / INVALID_TOKEN
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "403":
+          description: PROFILE_INCOMPLETE
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "404":
+          description: DRAFT_NOT_FOUND
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "409":
+          description: DRAFT_ALREADY_SUBMITTED / IDEMPOTENCY_CONFLICT
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: INTERNAL_ERROR
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Submit draft for review
+      tags:
+      - Listings
+  /listings/my:
+    get:
+      description: Returns all published (and pending) listings owned by the authenticated
+        host.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/listings.ListingHostReadSchema'
+            type: array
+        "401":
+          description: MISSING_TOKEN / INVALID_TOKEN
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "403":
+          description: PROFILE_INCOMPLETE
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: INTERNAL_ERROR
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get host's own listings
+      tags:
+      - Listings
+  /media/{media_id}/complete:
+    post:
+      description: Verifies uploaded object existence, size, and binary magic bytes
+        in storage. Marks media status as 'uploaded'.
+      parameters:
+      - description: Media UUID
+        format: uuid
+        in: path
+        name: media_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Upload confirmation and file key
+          schema:
+            $ref: '#/definitions/media.CompleteResponse'
+        "400":
+          description: INVALID_MEDIA_ID / INVALID_MEDIA_STATUS
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "401":
+          description: MISSING_TOKEN / INVALID_TOKEN
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "403":
+          description: PROFILE_INCOMPLETE / MEDIA_NOT_OWNED
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "422":
+          description: OBJECT_NOT_FOUND / INVALID_FILE_SIZE / INVALID_FILE_SIGNATURE
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: INTERNAL_ERROR
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Complete media upload
+      tags:
+      - Media
+  /media/dev-upload/{file_key}:
+    get:
+      description: Retrieves raw media bytes directly from local dev storage. **Dev
+        only.**
+      parameters:
+      - description: Storage file path/key
+        in: path
+        name: file_key
+        required: true
+        type: string
+      produces:
+      - image/jpeg
+      - image/png
+      - image/webp
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "404":
+          description: FILE_NOT_FOUND
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      summary: Dev get uploaded file
+      tags:
+      - Media
+    put:
+      consumes:
+      - application/octet-stream
+      description: Uploads file content directly to local development storage without
+        S3. **Dev only.**
+      parameters:
+      - description: Storage file path/key
+        in: path
+        name: file_key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: READ_ERROR
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: STORAGE_ERROR
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      summary: Dev direct file upload
+      tags:
+      - Media
+  /media/presign:
+    post:
+      consumes:
+      - application/json
+      description: Validates content type and file size, creates a media record with
+        'pending' status, and returns a presigned upload URL.
+      parameters:
+      - description: Media upload request parameters (content_type and file_size_bytes)
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/media.PresignRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Presigned upload URL and media metadata
+          schema:
+            $ref: '#/definitions/media.PresignResponse'
+        "400":
+          description: VALIDATION_ERROR / INVALID_CONTENT_TYPE / INVALID_FILE_SIZE
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "401":
+          description: MISSING_TOKEN / INVALID_TOKEN
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "403":
+          description: PROFILE_INCOMPLETE
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: INTERNAL_ERROR
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Request presigned upload URL
+      tags:
+      - Media
+  /notifications:
+    get:
+      description: Returns a paginated list of notifications for the authenticated
+        user.
+      parameters:
+      - description: Limit (default 20, max 100)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset (default 0)
+        in: query
+        name: offset
+        type: integer
+      - description: Filter by unread only
+        in: query
+        name: unread_only
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/notifications.NotificationListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get user notifications
+      tags:
+      - Notifications
+  /notifications/{id}/read:
+    patch:
+      description: Marks a specific notification as read.
+      parameters:
+      - description: Notification UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/notifications.SuccessResponse'
+        "400":
+          description: INVALID_ID
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "404":
+          description: NOT_FOUND
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Mark notification as read
+      tags:
+      - Notifications
+  /notifications/read-all:
+    post:
+      description: Marks all unread notifications for the user as read.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/notifications.SuccessResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Mark all notifications as read
+      tags:
+      - Notifications
+  /notifications/stream:
+    get:
+      description: Establishes a persistent SSE stream to deliver real-time notifications
+        to the client. Token can be passed in Authorization header or as ?token= query
+        param.
+      parameters:
+      - description: JWT access token (for EventSource)
+        in: query
+        name: token
+        type: string
+      produces:
+      - text/event-stream
+      responses:
+        "200":
+          description: 'event: notification\ndata: {...}\n\n'
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Stream real-time notifications (SSE)
+      tags:
+      - Notifications
+  /notifications/unread-count:
+    get:
+      description: Returns total count of unread notifications for the authenticated
+        user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/notifications.UnreadCountResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get unread notifications count
+      tags:
+      - Notifications
+securityDefinitions:
+  BearerAuth:
+    description: 'JWT access token. Format: **Bearer {token}**'
+    in: header
+    name: Authorization
+    type: apiKey
+  CookieAuth:
+    description: HttpOnly refresh token cookie set by /auth/verify-otp and rotated
+      by /auth/refresh.
+    in: cookie
+    name: refresh_token
+    type: apiKey
+swagger: "2.0"
