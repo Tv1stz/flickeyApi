@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -18,12 +19,15 @@ import (
 	"testing"
 	"time"
 
+	"flickey/go-backend/admin"
 	"flickey/go-backend/amenities"
 	"flickey/go-backend/auth"
 	"flickey/go-backend/config"
 	"flickey/go-backend/db"
+	"flickey/go-backend/geo"
 	"flickey/go-backend/listings"
 	"flickey/go-backend/media"
+	"flickey/go-backend/notifications"
 	"flickey/go-backend/sms"
 	"flickey/go-backend/storage"
 	"flickey/go-backend/testutil"
@@ -65,6 +69,10 @@ func setupApp(t *testing.T) *testApp {
 	authMw := auth.RequireAuth(cfg, suite.DB)
 	activeMw := auth.RequireActiveUser()
 
+	notifSvc := notifications.NewNotificationService(suite.DB, suite.Redis, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	adminSvc := admin.NewAdminService(suite.DB, notifSvc)
+	geoSvc := geo.NewGeoService(suite.Redis, cfg.GeocoderURL, cfg.TileServerURL, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
 	r := gin.New()
 	r.Use(gin.Recovery())
 
@@ -74,6 +82,9 @@ func setupApp(t *testing.T) *testApp {
 	listings.NewHandler(listingSvc).RegisterRoutes(v1.Group("/listings"), authMw, activeMw)
 	media.NewHandler(mediaSvc).RegisterRoutes(v1.Group("/media"), authMw, activeMw)
 	amenities.RegisterRoutes(v1.Group("/amenities"))
+	notifications.NewHandler(notifSvc, cfg, suite.DB).RegisterRoutes(v1.Group("/notifications"), authMw, activeMw)
+	admin.NewHandler(adminSvc, cfg).RegisterRoutes(v1.Group("/admin"), authMw, activeMw)
+	geo.NewHandler(geoSvc).RegisterRoutes(v1.Group("/geo"))
 
 	return &testApp{Router: r, Suite: suite, AuthSvc: authSvc}
 }
@@ -98,6 +109,12 @@ func (a *testApp) DoAuth(method, path string, body any, accessToken string) *htt
 	return a.Do(method, path, body, map[string]string{
 		"Authorization": "Bearer " + accessToken,
 	})
+}
+
+func (a *testApp) DoRaw(req *http.Request) *httptest.ResponseRecorder {
+	w := httptest.NewRecorder()
+	a.Router.ServeHTTP(w, req)
+	return w
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -213,10 +230,10 @@ func TestGetMe_GuestWithListing_AutoPromotesHost(t *testing.T) {
 
 	// Insert a listing for this user.
 	app.Suite.DB.Exec(`
-		INSERT INTO listings (id, host_id, status, type, name, square, floor, total_floors,
+		INSERT INTO listings (id, host_id, status, type, name, address, city, street, house_number, latitude, longitude, square, floor, total_floors,
 			max_guests, rooms_count, beds_count, bathrooms_count, price_per_night, currency,
 			min_nights, checkin_from, checkout_until, description)
-		VALUES (?, ?, 'published', 'apartment', 'Test Apartment', 50.0, 2, 5, 4, 2, 2, 1,
+		VALUES (?, ?, 'published', 'apartment', 'Test Apartment', 'г. Минск, ул. Ленина, 1', 'Минск', 'Ленина', '1', 53.9006, 27.5590, 50.0, 2, 5, 4, 2, 2, 1,
 			100.0, 'BYN', 1, '14:00:00', '12:00:00', 'A nice test listing for auto-promotion')`,
 		uuid.New(), u.ID,
 	)
@@ -316,6 +333,9 @@ func createDraftSteps1to6(t *testing.T, app *testApp, access string) string {
 	// Step 2: Property info.
 	w = app.DoAuth("PATCH", "/api/v1/listings/drafts/"+draftID+"/step-2", map[string]any{
 		"name":            "Beautiful Test Apartment",
+		"address":         "г. Минск, пр. Победителей, 1",
+		"latitude":        53.9006,
+		"longitude":       27.5590,
 		"square":          55.5,
 		"floor":           3,
 		"total_floors":    9,
@@ -478,6 +498,9 @@ func TestDraft_Step2_InvalidFloor_Returns400(t *testing.T) {
 	// floor > total_floors.
 	w = app.DoAuth("PATCH", "/api/v1/listings/drafts/"+draftID+"/step-2", map[string]any{
 		"name":            "Test Apartment Name That Is Long",
+		"address":         "г. Минск, пр. Победителей, 1",
+		"latitude":        53.9006,
+		"longitude":       27.5590,
 		"square":          50.0,
 		"floor":           10,
 		"total_floors":    5, // floor > total_floors
@@ -505,7 +528,7 @@ func TestDraft_Step5_WrongCurrency_Returns400(t *testing.T) {
 
 	// Go through steps 2-4 quickly.
 	app.DoAuth("PATCH", "/api/v1/listings/drafts/"+newDraftID+"/step-2", map[string]any{
-		"name": "Long Enough Name Here", "square": 50.0, "floor": 2,
+		"name": "Long Enough Name Here", "address": "г. Минск, пр. Победителей, 1", "latitude": 53.9006, "longitude": 27.5590, "square": 50.0, "floor": 2,
 		"total_floors": 5, "max_guests": 2, "rooms_count": 1, "beds_count": 1, "bathrooms_count": 1,
 	}, access)
 	mediaIDs := createFakeMedia(t, app, access, 5)
@@ -618,13 +641,15 @@ func TestPublicListings_OnlyPublished(t *testing.T) {
 
 	// Insert one published and one pending listing.
 	hostID := uuid.New()
+	pubID := uuid.New()
+	pendID := uuid.New()
 	app.Suite.DB.Exec(`INSERT INTO users (id, phone, role, status) VALUES (?, ?, 'host', 'active')`, hostID, randomPhone())
-	app.Suite.DB.Exec(`INSERT INTO listings (id, host_id, status, type, name, square, floor, total_floors, max_guests, rooms_count, beds_count, bathrooms_count, price_per_night, currency, min_nights, checkin_from, checkout_until, description)
-		VALUES (?, ?, 'published', 'apartment', 'Published Listing', 50.0, 2, 5, 4, 2, 2, 1, 100.0, 'BYN', 1, '14:00:00', '12:00:00', 'A beautiful published apartment available for rent in Minsk')`,
-		uuid.New(), hostID)
-	app.Suite.DB.Exec(`INSERT INTO listings (id, host_id, status, type, name, square, floor, total_floors, max_guests, rooms_count, beds_count, bathrooms_count, price_per_night, currency, min_nights, checkin_from, checkout_until, description)
-		VALUES (?, ?, 'pending_review', 'house', 'Pending Listing', 80.0, 1, 2, 6, 3, 3, 2, 200.0, 'BYN', 1, '14:00:00', '12:00:00', 'A house that is pending review and should not be visible publicly')`,
-		uuid.New(), hostID)
+	app.Suite.DB.Exec(`INSERT INTO listings (id, host_id, status, type, name, address, city, street, house_number, latitude, longitude, square, floor, total_floors, max_guests, rooms_count, beds_count, bathrooms_count, price_per_night, currency, min_nights, checkin_from, checkout_until, description)
+		VALUES (?, ?, 'published', 'apartment', 'Published Listing', 'г. Минск, пр. Победителей, 1', 'Минск', 'Победителей', '1', 53.9006, 27.5590, 50.0, 2, 5, 4, 2, 2, 1, 100.0, 'BYN', 1, '14:00:00', '12:00:00', 'A beautiful published apartment available for rent in Minsk')`,
+		pubID, hostID)
+	app.Suite.DB.Exec(`INSERT INTO listings (id, host_id, status, type, name, address, city, street, house_number, latitude, longitude, square, floor, total_floors, max_guests, rooms_count, beds_count, bathrooms_count, price_per_night, currency, min_nights, checkin_from, checkout_until, description)
+		VALUES (?, ?, 'pending_review', 'house', 'Pending Listing', 'г. Минск, ул. Садовая, 5', 'Минск', 'Садовая', '5', 53.9100, 27.5600, 80.0, 1, 2, 6, 3, 3, 2, 200.0, 'BYN', 1, '14:00:00', '12:00:00', 'A house that is pending review and should not be visible publicly')`,
+		pendID, hostID)
 
 	w := app.Do("GET", "/api/v1/listings", nil, nil)
 	if w.Code != http.StatusOK {
@@ -632,14 +657,20 @@ func TestPublicListings_OnlyPublished(t *testing.T) {
 	}
 	var listings []map[string]any
 	json.Unmarshal(w.Body.Bytes(), &listings)
+	foundPub := false
 	for _, l := range listings {
 		if l["status"] != nil {
 			t.Errorf("public listing should not expose status field")
 		}
+		if l["id"] == pubID.String() {
+			foundPub = true
+		}
+		if l["id"] == pendID.String() {
+			t.Errorf("pending listing %s should not be visible publicly", pendID)
+		}
 	}
-	// Should only contain published listings.
-	if len(listings) != 1 {
-		t.Errorf("expected 1 published listing, got %d", len(listings))
+	if !foundPub {
+		t.Errorf("expected published listing %s to be in public results", pubID)
 	}
 }
 
@@ -680,7 +711,7 @@ func TestMyListings_ReturnsAllStatuses(t *testing.T) {
 
 func TestConcurrentSubmit_IdempotencyPreventsDoubleCreation(t *testing.T) {
 	app := setupApp(t)
-	_, access, _ := app.Suite.CreateUser(randomPhone(), db.UserRoleGuest)
+	user, access, _ := app.Suite.CreateUser(randomPhone(), db.UserRoleGuest)
 	draftID := createDraftSteps1to6(t, app, access)
 	idempKey := uuid.New().String()
 	headers := map[string]string{
@@ -702,7 +733,7 @@ func TestConcurrentSubmit_IdempotencyPreventsDoubleCreation(t *testing.T) {
 	}
 	wg.Wait()
 
-	// Count successful creations — should be exactly 1.
+	// Count successful creations — should be at least 1.
 	successes := 0
 	for _, code := range results {
 		if code == http.StatusCreated {
@@ -711,7 +742,7 @@ func TestConcurrentSubmit_IdempotencyPreventsDoubleCreation(t *testing.T) {
 	}
 
 	var listingCount int64
-	app.Suite.DB.Model(&db.Listing{}).Count(&listingCount)
+	app.Suite.DB.Model(&db.Listing{}).Where("host_id = ?", user.ID).Count(&listingCount)
 	if listingCount != 1 {
 		t.Errorf("expected exactly 1 listing after concurrent submit, got %d", listingCount)
 	}

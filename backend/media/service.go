@@ -29,9 +29,26 @@ func NewMediaService(database *gorm.DB, store storage.StorageProvider, cfg *conf
 
 // AllowedContentTypes maps MIME type to file extension.
 var AllowedContentTypes = map[string]string{
-	"image/jpeg": ".jpg",
-	"image/png":  ".png",
-	"image/webp": ".webp",
+	"image/jpeg":      ".jpg",
+	"image/png":       ".png",
+	"image/webp":      ".webp",
+	"video/mp4":       ".mp4",
+	"video/quicktime": ".mov",
+	"video/webm":      ".webm",
+	"application/pdf": ".pdf",
+}
+
+func (s *MediaService) getMaxFileSize(contentType string) int64 {
+	if strings.HasPrefix(contentType, "video/") || contentType == "application/pdf" {
+		if s.Cfg != nil && s.Cfg.MediaVideoMaxFileSizeBytes > 0 {
+			return int64(s.Cfg.MediaVideoMaxFileSizeBytes)
+		}
+		return 104857600 // 100 MB
+	}
+	if s.Cfg != nil && s.Cfg.MediaMaxFileSizeBytes > 0 {
+		return int64(s.Cfg.MediaMaxFileSizeBytes)
+	}
+	return 15728640 // 15 MB
 }
 
 // CreatePresignedUpload validates the request, creates a media record, and returns a presigned URL.
@@ -43,10 +60,11 @@ func (s *MediaService) CreatePresignedUpload(ctx context.Context, hostID uuid.UU
 		}
 	}
 
-	if fileSizeBytes <= 0 || fileSizeBytes > int64(s.Cfg.MediaMaxFileSizeBytes) {
+	maxBytes := s.getMaxFileSize(contentType)
+	if fileSizeBytes <= 0 || fileSizeBytes > maxBytes {
 		return nil, &ValidationError{
 			Code:    "INVALID_FILE_SIZE",
-			Message: fmt.Sprintf("File size must be between 1 and %d bytes.", s.Cfg.MediaMaxFileSizeBytes),
+			Message: fmt.Sprintf("File size must be between 1 and %d bytes.", maxBytes),
 		}
 	}
 
@@ -120,7 +138,8 @@ func (s *MediaService) CompleteUpload(ctx context.Context, hostID, mediaID uuid.
 			contentLength = int64(v)
 		}
 	}
-	if contentLength <= 0 || contentLength > int64(s.Cfg.MediaMaxFileSizeBytes) {
+	maxBytes := s.getMaxFileSize(m.ContentType)
+	if contentLength <= 0 || contentLength > maxBytes {
 		return nil, &InvalidMediaError{
 			Code:    "INVALID_FILE_SIZE",
 			Message: fmt.Sprintf("Uploaded object size (%d bytes) is invalid or exceeds maximum allowed.", contentLength),
@@ -135,7 +154,7 @@ func (s *MediaService) CompleteUpload(ctx context.Context, hostID, mediaID uuid.
 	if !IsValidMagicBytes(header, m.ContentType) {
 		return nil, &InvalidMediaError{
 			Code:    "INVALID_FILE_SIGNATURE",
-			Message: "Uploaded file content does not match the declared image signature.",
+			Message: "Uploaded file content does not match the declared file signature.",
 		}
 	}
 
@@ -166,6 +185,18 @@ func IsValidMagicBytes(data []byte, contentType string) bool {
 		return len(data) >= 12 &&
 			bytes.HasPrefix(data, []byte("RIFF")) &&
 			bytes.Equal(data[8:12], []byte("WEBP"))
+	case "video/mp4":
+		return len(data) >= 8 && bytes.Equal(data[4:8], []byte("ftyp"))
+	case "video/quicktime":
+		if len(data) >= 8 {
+			tag := string(data[4:8])
+			return tag == "ftyp" || tag == "moov" || tag == "mdat" || tag == "wide"
+		}
+		return false
+	case "video/webm":
+		return bytes.HasPrefix(data, []byte{0x1A, 0x45, 0xDF, 0xA3})
+	case "application/pdf":
+		return bytes.HasPrefix(data, []byte("%PDF-"))
 	}
 	return false
 }

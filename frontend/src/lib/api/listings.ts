@@ -14,14 +14,35 @@ import type {
 	DraftDetail,
 	HousingType
 } from '$lib/types/listings';
+import type { PublicUser } from '$lib/types/users';
 
 export const listingsApi = {
 	/**
 	 * Public catalog of published listings.
 	 */
-	getPublicListings(housingType?: HousingType): Promise<ListingPublic[]> {
-		const query = housingType ? `?type=${encodeURIComponent(housingType)}` : '';
+	getPublicListings(
+		housingType?: HousingType,
+		checkin?: string | null,
+		checkout?: string | null,
+		hostId?: string | null
+	): Promise<ListingPublic[]> {
+		const params = new URLSearchParams();
+		if (housingType) params.set('type', housingType);
+		if (checkin) params.set('checkin', checkin);
+		if (checkout) params.set('checkout', checkout);
+		if (hostId) params.set('host_id', hostId);
+		const query = params.toString() ? `?${params.toString()}` : '';
 		return apiRequest<ListingPublic[]>(`/listings${query}`, {
+			method: 'GET',
+			skipAuth: true
+		});
+	},
+
+	/**
+	 * Public profile of a host / user.
+	 */
+	getPublicUser(userId: string): Promise<PublicUser> {
+		return apiRequest<PublicUser>(`/users/${userId}`, {
 			method: 'GET',
 			skipAuth: true
 		});
@@ -32,8 +53,7 @@ export const listingsApi = {
 	 */
 	getPublicListing(id: string): Promise<ListingPublic> {
 		return apiRequest<ListingPublic>(`/listings/${id}`, {
-			method: 'GET',
-			skipAuth: true
+			method: 'GET'
 		});
 	},
 
@@ -47,6 +67,43 @@ export const listingsApi = {
 	},
 
 	/**
+	 * Delete a listing owned by authenticated host.
+	 */
+	deleteListing(listingId: string): Promise<void> {
+		return apiRequest<void>(`/listings/${listingId}`, {
+			method: 'DELETE'
+		});
+	},
+
+	/**
+	 * Archive a listing owned by authenticated host.
+	 */
+	archiveListing(listingId: string): Promise<ListingHost> {
+		return apiRequest<ListingHost>(`/listings/${listingId}/archive`, {
+			method: 'POST'
+		});
+	},
+
+	/**
+	 * Unarchive a listing owned by authenticated host.
+	 */
+	unarchiveListing(listingId: string): Promise<ListingHost> {
+		return apiRequest<ListingHost>(`/listings/${listingId}/unarchive`, {
+			method: 'POST'
+		});
+	},
+
+	/**
+	 * Attach private apartment walkthrough video to a listing for verification.
+	 */
+	attachVerificationVideo(listingId: string, mediaId: string): Promise<ListingHost> {
+		return apiRequest<ListingHost>(`/listings/${listingId}/verification-video`, {
+			method: 'POST',
+			body: { media_id: mediaId }
+		});
+	},
+
+	/**
 	 * Step 1: Create a new listing draft with a specified housing type.
 	 */
 	createDraft(payload: CreateDraftRequest): Promise<CreateDraftResponse> {
@@ -55,6 +112,17 @@ export const listingsApi = {
 			body: payload
 		});
 	},
+
+	/**
+	 * Clone or create an edit draft from an existing listing.
+	 */
+	createDraftFromListing(listingId: string, mode?: 'create' | 'edit'): Promise<CreateDraftResponse> {
+		const query = mode ? `?mode=${mode}` : '';
+		return apiRequest<CreateDraftResponse>(`/listings/drafts/from-listing/${listingId}${query}`, {
+			method: 'POST'
+		});
+	},
+
 
 	/**
 	 * Fetch current state of a draft.

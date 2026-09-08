@@ -4,7 +4,9 @@ package db
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -207,6 +209,7 @@ func FindListingsByHost(ctx context.Context, db *gorm.DB, hostID uuid.UUID) ([]L
 	if err := db.WithContext(ctx).
 		Preload("ListingAmenities").
 		Preload("Media").
+		Preload("VerificationVideo").
 		Where("host_id = ?", hostID).
 		Order("created_at DESC").
 		Find(&listings).Error; err != nil {
@@ -217,27 +220,57 @@ func FindListingsByHost(ctx context.Context, db *gorm.DB, hostID uuid.UUID) ([]L
 
 // FindPublishedListings returns all listings with status = 'published'.
 func FindPublishedListings(ctx context.Context, db *gorm.DB) ([]Listing, error) {
+	return FindPublishedListingsWithDates(ctx, db, time.Time{}, time.Time{})
+}
+
+// FindPublishedListingsWithDates returns published listings optionally filtered by check-in and check-out dates.
+func FindPublishedListingsWithDates(ctx context.Context, db *gorm.DB, checkin, checkout time.Time) ([]Listing, error) {
+	return FindPublishedListingsWithDatesAndHost(ctx, db, checkin, checkout, nil)
+}
+
+// FindPublishedListingsWithDatesAndHost returns published listings optionally filtered by dates and host ID.
+func FindPublishedListingsWithDatesAndHost(ctx context.Context, db *gorm.DB, checkin, checkout time.Time, hostID *uuid.UUID) ([]Listing, error) {
 	var listings []Listing
-	if err := db.WithContext(ctx).
+	query := db.WithContext(ctx).
 		Preload("Host").
 		Preload("ListingAmenities").
 		Preload("Media").
-		Where("status = ?", "published").
-		Order("created_at DESC").
-		Find(&listings).Error; err != nil {
-		return nil, fmt.Errorf("FindPublishedListings: %w", err)
+		Where("status = ?", "published")
+
+	if hostID != nil && *hostID != uuid.Nil {
+		query = query.Where("host_id = ?", *hostID)
+	}
+
+	if !checkin.IsZero() && !checkout.IsZero() && checkout.After(checkin) {
+		nights := int(checkout.Sub(checkin).Hours() / 24)
+		if nights > 0 {
+			query = query.Where("min_nights <= ?", nights)
+		}
+
+		query = query.Where(`
+			NOT EXISTS (
+				SELECT 1 FROM listing_reservations r
+				WHERE r.listing_id = listings.id
+				  AND r.status != 'cancelled'
+				  AND r.start_date < ? AND r.end_date > ?
+			)
+		`, checkout, checkin)
+	}
+
+	if err := query.Order("created_at DESC").Find(&listings).Error; err != nil {
+		return nil, fmt.Errorf("FindPublishedListingsWithDatesAndHost: %w", err)
 	}
 	return listings, nil
 }
 
-// FindPublishedListingByID returns a single listing by ID.
+// FindPublishedListingByID returns a single published listing by ID.
 func FindPublishedListingByID(ctx context.Context, db *gorm.DB, listingID uuid.UUID) (*Listing, error) {
 	var l Listing
 	if err := db.WithContext(ctx).
 		Preload("Host").
 		Preload("ListingAmenities").
 		Preload("Media").
-		Where("id = ?", listingID).
+		Where("id = ? AND status = ?", listingID, "published").
 		First(&l).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
@@ -246,6 +279,138 @@ func FindPublishedListingByID(ctx context.Context, db *gorm.DB, listingID uuid.U
 	}
 	return &l, nil
 }
+
+// FindListingByIDAndHost returns a single listing by ID scoped by host_id (Anti-IDOR).
+func FindListingByIDAndHost(ctx context.Context, db *gorm.DB, listingID, hostID uuid.UUID) (*Listing, error) {
+	var l Listing
+	if err := db.WithContext(ctx).
+		Preload("Host").
+		Preload("ListingAmenities").
+		Preload("Media").
+		Preload("VerificationVideo").
+		Where("id = ? AND host_id = ?", listingID, hostID).
+		First(&l).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("FindListingByIDAndHost: %w", err)
+	}
+	return &l, nil
+}
+
+// FindListingByID returns a single listing by ID regardless of status or host (for Admin).
+func FindListingByID(ctx context.Context, db *gorm.DB, listingID uuid.UUID) (*Listing, error) {
+	var l Listing
+	if err := db.WithContext(ctx).
+		Preload("Host").
+		Preload("ListingAmenities").
+		Preload("Media").
+		Preload("VerificationVideo").
+		Where("id = ?", listingID).
+		First(&l).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("FindListingByID: %w", err)
+	}
+	return &l, nil
+}
+
+// LockListingByIDAndHost fetches a listing with SELECT FOR UPDATE inside a transaction.
+func LockListingByIDAndHost(ctx context.Context, tx *gorm.DB, listingID, hostID uuid.UUID) (*Listing, error) {
+	var l Listing
+	if err := tx.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).
+		Preload("ListingAmenities").
+		Preload("Media").
+		Preload("VerificationVideo").
+		Where("id = ? AND host_id = ?", listingID, hostID).
+		First(&l).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("LockListingByIDAndHost: %w", err)
+	}
+	return &l, nil
+}
+
+// DeleteListingByIDAndHost deletes a listing owned by hostID.
+func DeleteListingByIDAndHost(ctx context.Context, db *gorm.DB, listingID, hostID uuid.UUID) (bool, error) {
+	// First detach media
+	if err := db.WithContext(ctx).Model(&Media{}).Where("listing_id = ? AND host_id = ?", listingID, hostID).Update("listing_id", nil).Error; err != nil {
+		return false, fmt.Errorf("detach media: %w", err)
+	}
+	// Delete amenities junction records
+	if err := db.WithContext(ctx).Where("listing_id = ?", listingID).Delete(&ListingAmenity{}).Error; err != nil {
+		return false, fmt.Errorf("delete amenities: %w", err)
+	}
+	// Delete listing
+	res := db.WithContext(ctx).Where("id = ? AND host_id = ?", listingID, hostID).Delete(&Listing{})
+	if res.Error != nil {
+		return false, fmt.Errorf("delete listing: %w", res.Error)
+	}
+	return res.RowsAffected > 0, nil
+}
+
+// ArchiveListingByIDAndHost sets status to 'archived' for a listing owned by hostID.
+func ArchiveListingByIDAndHost(ctx context.Context, db *gorm.DB, listingID, hostID uuid.UUID) (*Listing, error) {
+	var l Listing
+	if err := db.WithContext(ctx).
+		Preload("Host").
+		Preload("ListingAmenities").
+		Preload("Media").
+		Where("id = ? AND host_id = ?", listingID, hostID).
+		First(&l).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("ArchiveListingByIDAndHost find: %w", err)
+	}
+
+	if err := db.WithContext(ctx).Model(&Listing{}).Where("id = ? AND host_id = ?", listingID, hostID).Update("status", "archived").Error; err != nil {
+		return nil, fmt.Errorf("ArchiveListingByIDAndHost update: %w", err)
+	}
+	l.Status = "archived"
+	return &l, nil
+}
+
+// UnarchiveListingByIDAndHost sets status for an archived listing owned by hostID.
+func UnarchiveListingByIDAndHost(ctx context.Context, db *gorm.DB, listingID, hostID uuid.UUID, newStatus string) (*Listing, error) {
+	var l Listing
+	if err := db.WithContext(ctx).
+		Preload("Host").
+		Preload("ListingAmenities").
+		Preload("Media").
+		Where("id = ? AND host_id = ?", listingID, hostID).
+		First(&l).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("UnarchiveListingByIDAndHost find: %w", err)
+	}
+
+	if err := db.WithContext(ctx).Model(&Listing{}).Where("id = ? AND host_id = ?", listingID, hostID).Update("status", newStatus).Error; err != nil {
+		return nil, fmt.Errorf("UnarchiveListingByIDAndHost update: %w", err)
+	}
+	l.Status = newStatus
+	return &l, nil
+}
+
+// FindPendingDraftBySourceListingID finds an active pending/submitted draft referencing a source listing.
+func FindPendingDraftBySourceListingID(ctx context.Context, db *gorm.DB, sourceListingID uuid.UUID) (*ListingDraft, error) {
+	var draft ListingDraft
+	if err := db.WithContext(ctx).
+		Where("source_listing_id = ? AND status IN ?", sourceListingID, []string{"pending_review", "submitted", "awaiting_company_verification"}).
+		First(&draft).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("FindPendingDraftBySourceListingID: %w", err)
+	}
+	return &draft, nil
+}
+
+
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MediaStore
@@ -279,6 +444,24 @@ func FindUploadedUnattachedMediaByIDsAndHost(ctx context.Context, db *gorm.DB, m
 		mediaIDs, hostID, MediaStatusUploaded,
 	).Find(&media).Error; err != nil {
 		return nil, fmt.Errorf("FindUploadedUnattachedMediaByIDsAndHost: %w", err)
+	}
+	return media, nil
+}
+
+// FindValidMediaForDraft fetches media records owned by host that can be used in a draft.
+// For create drafts: must be uploaded and unattached.
+// For edit drafts: may also be already attached to the source listing.
+func FindValidMediaForDraft(ctx context.Context, db *gorm.DB, mediaIDs []uuid.UUID, hostID uuid.UUID, sourceListingID *uuid.UUID) ([]Media, error) {
+	var media []Media
+	query := db.WithContext(ctx).Where("id IN ? AND host_id = ?", mediaIDs, hostID)
+	if sourceListingID != nil {
+		query = query.Where("(status = ? AND listing_id IS NULL) OR (listing_id = ? AND status = ?)",
+			MediaStatusUploaded, *sourceListingID, MediaStatusAttached)
+	} else {
+		query = query.Where("status = ? AND listing_id IS NULL", MediaStatusUploaded)
+	}
+	if err := query.Find(&media).Error; err != nil {
+		return nil, fmt.Errorf("FindValidMediaForDraft: %w", err)
 	}
 	return media, nil
 }
@@ -319,8 +502,48 @@ func UpdateMediaStatus(ctx context.Context, db *gorm.DB, mediaID uuid.UUID, stat
 // ─────────────────────────────────────────────────────────────────────────────
 
 // HasApprovedBusinessVerification checks if a host has an approved business verification.
-// Currently stubbed to return false — listings always start as awaiting_company_verification.
-// This matches the existing FastAPI behavior where the verifications table is not yet active.
-func HasApprovedBusinessVerification(_ context.Context, _ *gorm.DB, _ uuid.UUID) (bool, error) {
-	return false, nil
+func HasApprovedBusinessVerification(ctx context.Context, db *gorm.DB, userID uuid.UUID) (bool, error) {
+	var count int64
+	err := db.WithContext(ctx).Model(&VerificationRequest{}).
+		Where("user_id = ? AND status = ?", userID, "approved").
+		Count(&count).Error
+	if err != nil {
+		return false, fmt.Errorf("HasApprovedBusinessVerification: %w", err)
+	}
+	return count > 0, nil
 }
+
+// GetUserVerificationRequest returns the most recent verification request for a user.
+func GetUserVerificationRequest(ctx context.Context, db *gorm.DB, userID uuid.UUID) (*VerificationRequest, error) {
+	var v VerificationRequest
+	err := db.WithContext(ctx).Where("user_id = ?", userID).Order("created_at DESC").First(&v).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("GetUserVerificationRequest: %w", err)
+	}
+	return &v, nil
+}
+
+// SaveVerificationRequest creates or saves a verification request.
+func SaveVerificationRequest(ctx context.Context, db *gorm.DB, req *VerificationRequest) error {
+	return db.WithContext(ctx).Save(req).Error
+}
+
+// AutoPromoteListingsToPendingReview atomically advances all of a host's draft or awaiting listings
+// that have a verification video attached to pending_review once partner documents are approved.
+// Prevents race conditions with atomic SQL execution.
+func AutoPromoteListingsToPendingReview(ctx context.Context, tx *gorm.DB, hostID uuid.UUID) (int64, error) {
+	result := tx.WithContext(ctx).Model(&Listing{}).
+		Where("host_id = ? AND status IN ? AND verification_video_id IS NOT NULL", hostID, []string{"draft", "draft_video_required", "awaiting_company_verification"}).
+		Updates(map[string]any{
+			"status":     "pending_review",
+			"updated_at": time.Now(),
+		})
+	if result.Error != nil {
+		return 0, fmt.Errorf("AutoPromoteListingsToPendingReview: %w", result.Error)
+	}
+	return result.RowsAffected, nil
+}
+

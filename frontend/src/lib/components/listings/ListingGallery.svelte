@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Image as ImageIcon, X, ChevronLeft, ChevronRight } from 'lucide-svelte';
+	import { X, ChevronLeft, ChevronRight, Image as ImageIcon } from 'lucide-svelte';
 
 	interface Props {
 		photos: string[];
@@ -10,14 +10,8 @@
 
 	let selectedIndex = $state<number | null>(null);
 
-	const fallbackImages = [
-		'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=1200&auto=format&fit=crop&q=80',
-		'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=1200&auto=format&fit=crop&q=80',
-		'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=1200&auto=format&fit=crop&q=80',
-		'https://images.unsplash.com/photo-1484154218962-a197022b5858?w=1200&auto=format&fit=crop&q=80'
-	];
-
-	let displayPhotos = $derived(photos.length > 0 ? photos : fallbackImages);
+	let displayPhotos = $derived(photos || []);
+	let extraCount = $derived(Math.max(0, displayPhotos.length - 4));
 
 	function openModal(index: number) {
 		selectedIndex = index;
@@ -28,12 +22,12 @@
 	}
 
 	function prevPhoto() {
-		if (selectedIndex === null) return;
+		if (selectedIndex === null || displayPhotos.length === 0) return;
 		selectedIndex = (selectedIndex - 1 + displayPhotos.length) % displayPhotos.length;
 	}
 
 	function nextPhoto() {
-		if (selectedIndex === null) return;
+		if (selectedIndex === null || displayPhotos.length === 0) return;
 		selectedIndex = (selectedIndex + 1) % displayPhotos.length;
 	}
 
@@ -47,61 +41,112 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<!-- Gallery Grid Layout -->
-<div class="relative overflow-hidden rounded-2xl">
-	{#if displayPhotos.length === 1}
+{#if displayPhotos.length === 0}
+	<div class="w-full aspect-[2.2/1] rounded-3xl bg-muted/40 border border-border/80 flex flex-col items-center justify-center text-muted-foreground gap-2">
+		<ImageIcon class="h-8 w-8 text-muted-foreground/60" />
+		<span class="text-xs font-medium">Фотографии отсутствуют</span>
+	</div>
+{:else if displayPhotos.length === 1}
+	<div class="relative overflow-hidden rounded-3xl aspect-[2.2/1] bg-muted">
 		<button
 			type="button"
 			onclick={() => openModal(0)}
-			class="relative aspect-[16/9] w-full overflow-hidden bg-muted cursor-pointer block"
+			class="w-full h-full cursor-pointer block group"
 		>
-			<img src={displayPhotos[0]} alt={name} class="h-full w-full object-cover hover:scale-102 transition-transform duration-300" />
+			<img
+				src={displayPhotos[0]}
+				alt={name}
+				class="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
+			/>
 		</button>
-	{:else}
-		<div class="grid grid-cols-1 md:grid-cols-4 md:grid-rows-2 gap-2 aspect-[4/3] md:aspect-[21/9]">
-			<!-- Main Large Photo -->
+	</div>
+{:else}
+	<!-- Bento Grid 5-Photo Layout matching screenshot -->
+	<div class="grid grid-cols-1 md:grid-cols-4 md:grid-rows-2 gap-2.5 rounded-3xl overflow-hidden aspect-[4/3] md:aspect-[2.2/1]">
+		<!-- Photo 1: Large Main Hero (left column, spans 2 rows) -->
+		<button
+			type="button"
+			onclick={() => openModal(0)}
+			class="relative md:col-span-2 md:row-span-2 overflow-hidden rounded-2xl bg-muted cursor-pointer group block w-full h-full"
+		>
+			<img
+				src={displayPhotos[0]}
+				alt={`${name} - 1`}
+				class="h-full w-full object-cover group-hover:scale-102 transition-transform duration-300"
+			/>
+		</button>
+
+		<!-- Photo 2: Top Middle -->
+		{#if displayPhotos[1]}
 			<button
 				type="button"
-				onclick={() => openModal(0)}
-				class="relative md:col-span-2 md:row-span-2 overflow-hidden bg-muted cursor-pointer group"
+				onclick={() => openModal(1)}
+				class="relative hidden md:block overflow-hidden rounded-2xl bg-muted cursor-pointer group w-full h-full"
 			>
 				<img
-					src={displayPhotos[0]}
-					alt={`${name} - 1`}
-					class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
+					src={displayPhotos[1]}
+					alt={`${name} - 2`}
+					class="h-full w-full object-cover group-hover:scale-103 transition-transform duration-300"
 				/>
 			</button>
+		{/if}
 
-			<!-- 4 Secondary Photos -->
-			{#each displayPhotos.slice(1, 5) as photo, idx}
-				<button
-					type="button"
-					onclick={() => openModal(idx + 1)}
-					class="relative hidden md:block overflow-hidden bg-muted cursor-pointer group"
-				>
-					<img
-						src={photo}
-						alt={`${name} - ${idx + 2}`}
-						class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
-					/>
-				</button>
-			{/each}
-		</div>
-	{/if}
+		<!-- Photo 3: Top Right -->
+		{#if displayPhotos[2]}
+			<button
+				type="button"
+				onclick={() => openModal(2)}
+				class="relative hidden md:block overflow-hidden rounded-2xl bg-muted cursor-pointer group w-full h-full"
+			>
+				<img
+					src={displayPhotos[2]}
+					alt={`${name} - 3`}
+					class="h-full w-full object-cover group-hover:scale-103 transition-transform duration-300"
+				/>
+			</button>
+		{/if}
 
-	<!-- View All Photos Badge -->
-	<button
-		type="button"
-		onclick={() => openModal(0)}
-		class="absolute bottom-4 right-4 flex items-center gap-1.5 rounded-xl bg-background/90 backdrop-blur-md px-3.5 py-2 text-xs font-bold text-foreground shadow-lg hover:bg-background transition-all cursor-pointer"
-	>
-		<ImageIcon class="h-4 w-4 text-primary" />
-		<span>Все фото ({displayPhotos.length})</span>
-	</button>
-</div>
+		<!-- Photo 4: Bottom Middle -->
+		{#if displayPhotos[3]}
+			<button
+				type="button"
+				onclick={() => openModal(3)}
+				class="relative hidden md:block overflow-hidden rounded-2xl bg-muted cursor-pointer group w-full h-full"
+			>
+				<img
+					src={displayPhotos[3]}
+					alt={`${name} - 4`}
+					class="h-full w-full object-cover group-hover:scale-103 transition-transform duration-300"
+				/>
+			</button>
+		{/if}
+
+		<!-- Photo 5: Bottom Right with Overlay badge -->
+		{#if displayPhotos[4]}
+			<button
+				type="button"
+				onclick={() => openModal(4)}
+				class="relative hidden md:block overflow-hidden rounded-2xl bg-muted cursor-pointer group w-full h-full"
+			>
+				<img
+					src={displayPhotos[4]}
+					alt={`${name} - 5`}
+					class="h-full w-full object-cover group-hover:scale-103 transition-transform duration-300"
+				/>
+				{#if extraCount > 0}
+					<div class="absolute inset-0 bg-black/45 backdrop-blur-[1px] flex items-center justify-center group-hover:bg-black/55 transition-colors">
+						<span class="text-white font-medium text-xs sm:text-sm">
+							ещё {extraCount} фото
+						</span>
+					</div>
+				{/if}
+			</button>
+		{/if}
+	</div>
+{/if}
 
 <!-- Modal Fullscreen Lightbox -->
-{#if selectedIndex !== null}
+{#if selectedIndex !== null && displayPhotos.length > 0}
 	<div
 		class="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in"
 		role="dialog"
@@ -133,11 +178,11 @@
 		</button>
 
 		<!-- Main Image -->
-		<div class="relative max-h-[85vh] max-w-[90vw] overflow-hidden rounded-xl">
+		<div class="relative max-h-[85vh] max-w-[90vw] overflow-hidden rounded-2xl">
 			<img
 				src={displayPhotos[selectedIndex]}
 				alt={`${name} - ${selectedIndex + 1}`}
-				class="max-h-[85vh] max-w-[90vw] object-contain rounded-xl shadow-2xl"
+				class="max-h-[85vh] max-w-[90vw] object-contain rounded-2xl shadow-2xl"
 			/>
 		</div>
 

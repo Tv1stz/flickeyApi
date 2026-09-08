@@ -11,3 +11,7 @@ export interface GeoSuggestItem {
 export interface GeoSuggestResponse {
 	results: GeoSuggestItem[];
 }
+
+export interface GeoReverseResponse {
+	item: GeoSuggestItem | null;
+}

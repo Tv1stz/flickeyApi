@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite dev --port 5173",
+    "dev": "vite dev --port 3000",
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
@@ -20,6 +20,7 @@
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
     "@testing-library/svelte": "^5.2.7",
     "@types/node": "^22.10.0",
+    "@types/yandex-maps": "^2.1.36",
     "autoprefixer": "^10.4.20",
     "clsx": "^2.1.1",
     "jsdom": "^26.0.0",
@@ -35,10 +36,9 @@
     "vitest": "^3.0.0"
   },
   "dependencies": {
-    "@types/leaflet": "^1.9.22",
     "clsx": "^2.1.1",
-    "leaflet": "^1.9.4",
-    "maplibre-gl": "^6.6.0",
+    "embla-carousel": "^8.6.0",
+    "svelte-dnd-action": "^0.9.79",
     "tailwind-merge": "^2.6.0"
   }
 }

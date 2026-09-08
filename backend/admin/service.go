@@ -3,6 +3,7 @@ package admin
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -97,7 +98,7 @@ func (s *AdminService) GetListings(ctx context.Context, status string) ([]db.Lis
 
 func (s *AdminService) GetListingByID(ctx context.Context, listingID uuid.UUID) (*db.Listing, error) {
 	var listing db.Listing
-	if err := s.DB.WithContext(ctx).Preload("Host").Preload("ListingAmenities").Preload("Media").Where("id = ?", listingID).First(&listing).Error; err != nil {
+	if err := s.DB.WithContext(ctx).Preload("Host").Preload("ListingAmenities").Preload("Media").Preload("VerificationVideo").Where("id = ?", listingID).First(&listing).Error; err != nil {
 		return nil, fmt.Errorf("listing not found: %w", err)
 	}
 	return &listing, nil
@@ -126,6 +127,120 @@ func (s *AdminService) ModerateListing(ctx context.Context, admin *db.User, list
 	}
 
 	listing.Status = newStatus
+
+	// If there is an active edit draft pending moderation for this listing, apply or reject it
+	pendingDraft, _ := db.FindPendingDraftBySourceListingID(ctx, s.DB, listingID)
+	if pendingDraft != nil {
+		if action == "approve" {
+			if pendingDraft.Type != nil {
+				listing.Type = *pendingDraft.Type
+			}
+			if pendingDraft.Name != nil {
+				listing.Name = *pendingDraft.Name
+			}
+			if pendingDraft.Address != nil {
+				listing.Address = *pendingDraft.Address
+			}
+			if pendingDraft.City != nil {
+				listing.City = *pendingDraft.City
+			}
+			if pendingDraft.Street != nil {
+				listing.Street = *pendingDraft.Street
+			}
+			if pendingDraft.HouseNumber != nil {
+				listing.HouseNumber = *pendingDraft.HouseNumber
+			}
+			if pendingDraft.Latitude != nil {
+				listing.Latitude = *pendingDraft.Latitude
+			}
+			if pendingDraft.Longitude != nil {
+				listing.Longitude = *pendingDraft.Longitude
+			}
+			if pendingDraft.Square != nil {
+				listing.Square = *pendingDraft.Square
+			}
+			if pendingDraft.Floor != nil {
+				listing.Floor = *pendingDraft.Floor
+			}
+			if pendingDraft.TotalFloors != nil {
+				listing.TotalFloors = *pendingDraft.TotalFloors
+			}
+			if pendingDraft.MaxGuests != nil {
+				listing.MaxGuests = *pendingDraft.MaxGuests
+			}
+			if pendingDraft.RoomsCount != nil {
+				listing.RoomsCount = *pendingDraft.RoomsCount
+			}
+			if pendingDraft.BedsCount != nil {
+				listing.BedsCount = *pendingDraft.BedsCount
+			}
+			if pendingDraft.BathroomsCount != nil {
+				listing.BathroomsCount = *pendingDraft.BathroomsCount
+			}
+			if pendingDraft.PricePerNight != nil {
+				listing.PricePerNight = *pendingDraft.PricePerNight
+			}
+			if pendingDraft.Currency != nil {
+				listing.Currency = *pendingDraft.Currency
+			}
+			if pendingDraft.MinNights != nil {
+				listing.MinNights = *pendingDraft.MinNights
+			}
+			if pendingDraft.CheckinFrom != nil {
+				listing.CheckinFrom = *pendingDraft.CheckinFrom
+			}
+			if pendingDraft.CheckoutUntil != nil {
+				listing.CheckoutUntil = *pendingDraft.CheckoutUntil
+			}
+			if pendingDraft.AllowChildren != nil {
+				listing.AllowChildren = *pendingDraft.AllowChildren
+			}
+			if pendingDraft.AllowPets != nil {
+				listing.AllowPets = *pendingDraft.AllowPets
+			}
+			if pendingDraft.AllowSmoking != nil {
+				listing.AllowSmoking = *pendingDraft.AllowSmoking
+			}
+			if pendingDraft.AllowParties != nil {
+				listing.AllowParties = *pendingDraft.AllowParties
+			}
+			if pendingDraft.DepositRequired != nil {
+				listing.DepositRequired = *pendingDraft.DepositRequired
+			}
+			if pendingDraft.WithInvoicing != nil {
+				listing.WithInvoicing = *pendingDraft.WithInvoicing
+			}
+			if pendingDraft.Description != nil {
+				listing.Description = *pendingDraft.Description
+			}
+
+			// Replace amenities
+			var amenityIDs []string
+			if pendingDraft.Amenities != nil {
+				_ = json.Unmarshal(pendingDraft.Amenities, &amenityIDs)
+				_ = s.DB.WithContext(ctx).Where("listing_id = ?", listing.ID).Delete(&db.ListingAmenity{}).Error
+				_ = db.AddListingAmenities(ctx, s.DB, listing.ID, amenityIDs)
+			}
+
+			// Attach media
+			var mediaIDStrs []string
+			if pendingDraft.MediaIDs != nil {
+				_ = json.Unmarshal(pendingDraft.MediaIDs, &mediaIDStrs)
+				mediaIDs := make([]uuid.UUID, len(mediaIDStrs))
+				for i, idStr := range mediaIDStrs {
+					mediaIDs[i], _ = uuid.Parse(idStr)
+				}
+				_, _ = db.AttachMediaToListing(ctx, s.DB, mediaIDs, listing.HostID, listing.ID)
+			}
+
+			pendingDraft.Status = "approved"
+			_ = db.SaveDraft(ctx, s.DB, pendingDraft)
+		} else if action == "reject" {
+			pendingDraft.Status = "rejected"
+			_ = db.SaveDraft(ctx, s.DB, pendingDraft)
+		}
+	}
+
 	if err := s.DB.WithContext(ctx).Save(&listing).Error; err != nil {
 		return nil, err
 	}
@@ -177,7 +292,7 @@ func (s *AdminService) ModerateListing(ctx context.Context, admin *db.User, list
 		}
 	}
 
-	return &listing, nil
+	return s.GetListingByID(ctx, listingID)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -361,13 +476,21 @@ func (s *AdminService) ReviewVerification(ctx context.Context, admin *db.User, r
 	if s.Notifications != nil {
 		switch action {
 		case "approve":
+			// Atomically promote all draft or awaiting listings that have a verification video to pending_review
+			promotedCount, _ := db.AutoPromoteListingsToPendingReview(ctx, s.DB, v.UserID)
+
+			approveMsg := "Ваша заявка на верификацию успешно одобрена администрацией."
+			if promotedCount > 0 {
+				approveMsg += fmt.Sprintf(" %d объявление(й) автоматически передано на модерацию.", promotedCount)
+			}
+
 			_, _ = s.Notifications.CreateNotification(
 				ctx,
 				v.UserID,
 				"verification_approved",
 				"Верификация подтверждена",
-				"Ваша заявка на верификацию успешно одобрена администрацией.",
-				map[string]any{"verification_id": v.ID},
+				approveMsg,
+				map[string]any{"verification_id": v.ID, "promoted_listings": promotedCount},
 			)
 		case "reject":
 			msg := "Ваша заявка на верификацию отклонена."

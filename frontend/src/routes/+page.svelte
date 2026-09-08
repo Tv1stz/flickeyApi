@@ -1,128 +1,107 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import type { PageData } from './$types';
-	import type { HousingType, ListingPublic } from '$lib/types/listings';
-	import { listingsApi } from '$lib/api/listings';
-	import ListingCard from '$lib/components/listings/ListingCard.svelte';
-	import ListingFilterBar from '$lib/components/listings/ListingFilterBar.svelte';
-	import Skeleton from '$lib/components/ui/Skeleton.svelte';
-	import Button from '$lib/components/ui/Button.svelte';
-	import { Building2, Sparkles, PlusCircle } from 'lucide-svelte';
+	import ListingGrid from '$lib/components/card/ListingGrid.svelte';
+	import SearchBarMobile from '$lib/components/search/panels/SearchBarMobile.svelte';
+	import SearchPanelMobile from '$lib/components/search/panels/SearchPanelMobile.svelte';
+	import { searchStore } from '$lib/stores/searchStore.svelte';
+	import {
+		getCityOptionsFromListings,
+		getPopularCitiesFromListings,
+		buildSearchUrl
+	} from '$lib/components/search/taxonomy';
+	import { resolve } from '$app/paths';
+	import { goto } from '$app/navigation';
+	import { fade } from 'svelte/transition';
+	import { favoritesStore } from '$lib/stores/favoritesStore.svelte';
+	import type { Listing } from '$lib/components/card/types';
+	import { apiListingToCardListing } from '$lib/utils/listingConverters';
 
 	let { data }: { data: PageData } = $props();
 
-	let selectedType = $state<HousingType | 'all'>('all');
-	let searchQuery = $state<string>('');
-	let clientListings = $state<ListingPublic[]>([]);
-	let isFiltering = $state<boolean>(false);
+	let favorites = $derived(favoritesStore.favoriteIds);
+	let allListings = $derived((data.listings || []).map(apiListingToCardListing));
+	let mobileSearchOpen = $state(false);
 
-	$effect(() => {
-		clientListings = data.listings || [];
-	});
-
-	// Client-side instant filter by query
-	let filteredListings = $derived(
-		clientListings.filter((item) => {
-			if (!searchQuery.trim()) return true;
-			const q = searchQuery.toLowerCase();
-			return (
-				item.name.toLowerCase().includes(q) ||
-				(item.description && item.description.toLowerCase().includes(q))
-			);
-		})
-	);
-
-	async function handleFilterChange(type: HousingType | 'all', query: string) {
-		selectedType = type;
-		searchQuery = query;
-
-		isFiltering = true;
-		try {
-			const res = await listingsApi.getPublicListings(type === 'all' ? undefined : type);
-			clientListings = res || [];
-		} catch {
-			clientListings = [];
-		} finally {
-			isFiltering = false;
+	onMount(() => {
+		searchStore.resetAll();
+		if (allListings.length > 0) {
+			searchStore.setListings(allListings);
+			searchStore.setAvailableCities(getCityOptionsFromListings(allListings));
+			searchStore.setPopularCities(getPopularCitiesFromListings(allListings));
 		}
-	}
+	});
 </script>
 
 <svelte:head>
-	<title>Flickey — Посуточная аренда квартир, домов и усадеб в Беларуси</title>
-	<meta
-		name="description"
-		content="Сервис краткосрочной аренды проверенного жилья в Беларуси. Квартиры, коттеджи и агроусадьбы без посредников."
-	/>
+	<title>Flickey — Аренда жилья посуточно</title>
+	<meta name="description" content="Квартиры, дома и апартаменты для посуточной аренды в Беларуси." />
 </svelte:head>
 
-<div class="container mx-auto px-4 sm:px-6 py-8 space-y-10">
-	<!-- Hero Section -->
-	<section class="text-center max-w-3xl mx-auto space-y-4 pt-4 pb-2">
-		<div class="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3.5 py-1 text-xs font-bold text-primary">
-			<Sparkles class="h-3.5 w-3.5" />
-			<span>Проверенное жилье в Беларуси</span>
+<div class="min-h-screen bg-white">
+	<SearchPanelMobile
+		variant="home"
+		title="Найти жильё"
+		subtitle="Город · Тип · Гости"
+		onOpenSearch={() => (mobileSearchOpen = true)}
+		class="lg:hidden"
+	/>
+
+	<section class="pt-8 pb-8 lg:pt-32 lg:pb-10">
+		<div class="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8">
+			<div class="mx-auto max-w-3xl text-center">
+				<h1
+					class="text-4xl leading-[1.05] font-bold tracking-tight text-slate-900 sm:text-5xl md:text-6xl lg:text-7xl"
+				>
+					Найдите место,<br />
+					<span
+						class="bg-gradient-to-r from-zinc-900 via-zinc-700 to-zinc-900 bg-clip-text text-transparent"
+					>
+						где хочется остаться
+					</span>
+				</h1>
+				<p class="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-zinc-500 sm:text-xl">
+					Квартиры, дома и апартаменты для незабываемого отдыха
+				</p>
+			</div>
 		</div>
-		<h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight text-foreground leading-[1.15]">
-			Найдите идеальное место для отдыха или работы
-		</h1>
-		<p class="text-sm sm:text-base text-muted-foreground max-w-xl mx-auto leading-relaxed">
-			Уютные квартиры, загородные дома и усадьбы с проверенными фотографиями и мгновенным бронированием.
-		</p>
 	</section>
 
-	<!-- Filters & Search Bar -->
-	<section class="max-w-4xl mx-auto">
-		<ListingFilterBar
-			bind:selectedType
-			bind:searchQuery
-			onfilter={handleFilterChange}
-		/>
-	</section>
-
-	<!-- Listings Grid -->
-	<section>
-		{#if isFiltering}
-			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-				{#each Array(8) as _}
-					<div class="flex flex-col rounded-2xl border border-border bg-card p-4 space-y-3">
-						<Skeleton class="aspect-[4/3] w-full rounded-xl" />
-						<Skeleton class="h-5 w-3/4" />
-						<Skeleton class="h-4 w-1/2" />
-						<div class="pt-4 flex justify-between">
-							<Skeleton class="h-6 w-1/3" />
-							<Skeleton class="h-4 w-1/4" />
+	<section class="pb-32 lg:pb-20">
+		<div class="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8">
+			<div in:fade={{ duration: 300 }}>
+				{#if allListings.length > 0}
+					<ListingGrid
+						listings={allListings}
+						{favorites}
+						emptyMessage="Ничего не найдено"
+						emptyDescription="Попробуйте изменить параметры поиска"
+					/>
+				{:else}
+					<div class="rounded-3xl border border-dashed border-zinc-200 p-12 text-center max-w-lg mx-auto space-y-4">
+						<h3 class="text-lg font-bold text-zinc-900">Объявлений пока нет</h3>
+						<p class="text-sm text-zinc-500 leading-relaxed">
+							В этой категории пока нет опубликованных объявлений. Вы можете стать первым арендодателем!
+						</p>
+						<div class="pt-2">
+							<a
+								href="/host/new"
+								class="inline-flex items-center justify-center rounded-2xl bg-zinc-900 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800 transition-colors"
+							>
+								Сдать жильё
+							</a>
 						</div>
 					</div>
-				{/each}
+				{/if}
 			</div>
-		{:else if filteredListings.length > 0}
-			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-				{#each filteredListings as listing (listing.id)}
-					<ListingCard {listing} />
-				{/each}
-			</div>
-		{:else}
-			<!-- Empty State -->
-			<div class="rounded-3xl border border-dashed border-border bg-muted/20 p-12 text-center max-w-lg mx-auto space-y-4">
-				<div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
-					<Building2 class="h-7 w-7" />
-				</div>
-				<h3 class="text-lg font-bold text-foreground">Объявлений пока нет</h3>
-				<p class="text-xs text-muted-foreground leading-relaxed">
-					{#if searchQuery}
-						По запросу «{searchQuery}» ничего не найдено. Попробуйте изменить параметры поиска.
-					{:else}
-						В этой категории пока нет опубликованных объявлений. Вы можете стать первым арендодателем!
-					{/if}
-				</p>
-				<div class="pt-2">
-					<a href="/host/new">
-						<Button size="sm" class="gap-2 font-semibold">
-							<PlusCircle class="h-4 w-4" /> Сдать свое жилье
-						</Button>
-					</a>
-				</div>
-			</div>
-		{/if}
+		</div>
 	</section>
 </div>
+
+<SearchBarMobile
+	open={mobileSearchOpen}
+	listings={allListings}
+	onClose={() => (mobileSearchOpen = false)}
+	onApply={() => goto(buildSearchUrl(searchStore.params))}
+/>
+

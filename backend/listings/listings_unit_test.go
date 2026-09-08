@@ -13,7 +13,7 @@ import (
 func testListingConfig() *config.Settings {
 	return &config.Settings{
 		MediaMinCount: 5,
-		MediaMaxCount: 15,
+		MediaMaxCount: 25,
 	}
 }
 
@@ -102,5 +102,17 @@ func TestListingService_ContextPropagation(t *testing.T) {
 	id := uuid.New()
 	if id == uuid.Nil {
 		t.Fatal("generated UUID should not be nil")
+	}
+}
+
+func TestDraftDetailResponse_MediaItems(t *testing.T) {
+	resp := listings.DraftDetailResponse{
+		MediaIDs: []string{"00000000-0000-0000-0000-000000000001"},
+		Media: []listings.DraftMediaItem{
+			{ID: "00000000-0000-0000-0000-000000000001", URL: "http://localhost:8000/api/v1/media/dev-upload/test.jpg"},
+		},
+	}
+	if len(resp.Media) != 1 || resp.Media[0].URL == "" {
+		t.Errorf("expected 1 media item with url, got %+v", resp.Media)
 	}
 }

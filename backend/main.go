@@ -37,6 +37,7 @@ import (
 	"flickey/go-backend/admin"
 	"flickey/go-backend/amenities"
 	"flickey/go-backend/auth"
+	"flickey/go-backend/calendar"
 	"flickey/go-backend/config"
 	"flickey/go-backend/db"
 	_ "flickey/go-backend/docs"
@@ -46,6 +47,7 @@ import (
 	"flickey/go-backend/notifications"
 	"flickey/go-backend/sms"
 	"flickey/go-backend/storage"
+	"flickey/go-backend/verification"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -89,6 +91,13 @@ func main() {
 
 	// Ensure default persistent admin account exists
 	ensureDefaultAdmin(database, logger)
+
+	// Ensure calendar tables and constraints exist
+	if err := calendar.AutoMigrateCalendar(database); err != nil {
+		logger.Error("failed to migrate calendar tables", "error", err)
+		os.Exit(1)
+	}
+	logger.Info("calendar tables migrated")
 
 	// ── Redis ─────────────────────────────────────────────────────────────────
 	rdb, err := db.NewRedis(cfg)
@@ -136,7 +145,8 @@ func main() {
 	mediaSvc := media.NewMediaService(database, store, cfg)
 	listingSvc := listings.NewListingService(database, rdb, cfg)
 	notifSvc := notifications.NewNotificationService(database, rdb, logger)
-	geoSvc := geo.NewGeoService(rdb, cfg.GeocoderURL, logger)
+	geoSvc := geo.NewGeoService(rdb, cfg.GeocoderURL, cfg.TileServerURL, logger)
+	calendarSvc := calendar.NewCalendarService(database, "http://localhost:"+cfg.Port)
 
 	// ── Middleware ────────────────────────────────────────────────────────────
 	authMiddleware := auth.RequireAuth(cfg, database)
@@ -156,10 +166,15 @@ func main() {
 	authGroup := v1.Group("/auth")
 	authHandler.RegisterRoutes(authGroup, authMiddleware, activeMiddleware)
 
-	// Listings
+	// Listings & Calendar
 	listingHandler := listings.NewHandler(listingSvc)
+	calendarHandler := calendar.NewHandler(calendarSvc)
 	listingGroup := v1.Group("/listings")
 	listingHandler.RegisterRoutes(listingGroup, authMiddleware, activeMiddleware)
+	calendarHandler.RegisterRoutes(listingGroup, authMiddleware, activeMiddleware)
+
+	// Public Users / Hosts
+	v1.GET("/users/:id", listingHandler.GetPublicHostProfile)
 
 	// Media
 	mediaHandler := media.NewHandler(mediaSvc)
@@ -180,6 +195,11 @@ func main() {
 	notifGroup := v1.Group("/notifications")
 	notifHandler.RegisterRoutes(notifGroup, authMiddleware, activeMiddleware)
 
+	// Host Verification (Belarus legal requisites)
+	verificationHandler := verification.NewHandler(database)
+	verificationGroup := v1.Group("/verification")
+	verificationHandler.RegisterRoutes(verificationGroup, authMiddleware, activeMiddleware)
+
 	// Admin
 	adminSvc := admin.NewAdminService(database, notifSvc)
 	adminHandler := admin.NewHandler(adminSvc, cfg)
@@ -196,6 +216,11 @@ func main() {
 		r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 		logger.Info("Swagger UI enabled", "url", "http://localhost:"+cfg.Port+"/swagger/index.html")
 	}
+
+	// ── Calendar Sync Background Worker ───────────────────────────────────────
+	syncWorker := calendar.NewSyncWorker(calendarSvc, database, 15*time.Minute, 5)
+	syncWorkerCtx, syncWorkerCancel := context.WithCancel(context.Background())
+	syncWorker.Start(syncWorkerCtx)
 
 	// ── HTTP Server ───────────────────────────────────────────────────────────
 	srv := &http.Server{
@@ -222,6 +247,9 @@ func main() {
 	<-quit
 
 	logger.Info("shutting down...")
+	syncWorkerCancel()
+	syncWorker.Stop()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 

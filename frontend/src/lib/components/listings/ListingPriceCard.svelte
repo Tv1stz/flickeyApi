@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Button from '$lib/components/ui/Button.svelte';
 	import { formatCurrency } from '$lib/utils';
-	import { Sparkles, Edit3, ArrowLeft, Send } from 'lucide-svelte';
+	import { ArrowLeft, Send } from 'lucide-svelte';
 
 	interface Props {
 		pricePerNight: number;
@@ -10,84 +10,65 @@
 		mode?: 'public' | 'preview';
 		onpublish?: () => void;
 		onedit?: () => void;
+		oncontact?: () => void;
 	}
 
 	let {
-		pricePerNight = 100,
+		pricePerNight,
 		currency = 'BYN',
 		minNights = 1,
 		mode = 'public',
 		onpublish,
-		onedit
+		onedit,
+		oncontact
 	}: Props = $props();
 
-	let nightsCount = $state<number>(1);
-	$effect(() => {
-		nightsCount = minNights || 1;
-	});
-
-	let totalPrice = $derived(pricePerNight * nightsCount);
+	function getNightWord(n: number): string {
+		if (n === 1) return 'ночь';
+		if (n >= 2 && n <= 4) return 'ночи';
+		return 'ночей';
+	}
 </script>
 
-<div class="sticky top-24 rounded-3xl border border-border bg-card p-6 shadow-xl space-y-6">
+<div class="rounded-3xl border border-border/80 bg-card p-6 shadow-xs space-y-4">
 	{#if mode === 'preview'}
-		<div class="rounded-xl bg-amber-500/10 border border-amber-500/20 p-3 text-center text-xs font-bold text-amber-700 dark:text-amber-400">
-			✨ Режим предпросмотра черновика
+		<div class="rounded-xl bg-amber-500/10 border border-amber-500/20 p-2.5 text-center text-xs font-bold text-amber-700 dark:text-amber-400">
+			✨ Режим предпросмотра
 		</div>
 	{/if}
 
+	<!-- Dynamic Price Headline matching screenshot style -->
 	<div>
-		<span class="text-xs text-muted-foreground font-medium">Стоимость</span>
-		<div class="flex items-baseline gap-1 mt-1">
-			<span class="text-3xl font-extrabold text-foreground tracking-tight">
-				{formatCurrency(pricePerNight, currency)}
+		<div class="flex items-baseline gap-1.5">
+			<span class="text-xs font-medium text-muted-foreground">от</span>
+			<span class="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
+				{pricePerNight} {currency}
 			</span>
-			<span class="text-xs text-muted-foreground">/ сутки</span>
+			<span class="text-xs text-muted-foreground font-normal">/ ночь</span>
 		</div>
+		{#if minNights && minNights > 1}
+			<p class="text-[11px] text-muted-foreground mt-0.5 font-normal">
+				мин. {minNights} {getNightWord(minNights)}
+			</p>
+		{/if}
 	</div>
 
-	<div class="rounded-2xl border border-border bg-muted/20 p-4 space-y-3">
-		<div class="flex items-center justify-between text-xs">
-			<span class="text-muted-foreground">Количество ночей:</span>
-			<div class="flex items-center gap-2">
-				<button
-					type="button"
-					onclick={() => (nightsCount = Math.max(minNights || 1, nightsCount - 1))}
-					class="h-7 w-7 rounded-lg border border-border bg-card font-bold hover:bg-accent cursor-pointer"
-				>
-					-
-				</button>
-				<span class="font-bold text-sm min-w-[20px] text-center">{nightsCount}</span>
-				<button
-					type="button"
-					onclick={() => (nightsCount = nightsCount + 1)}
-					class="h-7 w-7 rounded-lg border border-border bg-card font-bold hover:bg-accent cursor-pointer"
-				>
-					+
-				</button>
-			</div>
-		</div>
-
-		<div class="pt-2 border-t border-border/60 flex items-center justify-between text-xs">
-			<span class="text-muted-foreground">{pricePerNight} {currency} × {nightsCount} ноч.</span>
-			<span class="font-bold text-foreground">{totalPrice} {currency}</span>
-		</div>
-	</div>
-
+	<!-- Primary Action Button matching screenshot style -->
 	{#if mode === 'public'}
-		<Button class="w-full h-12 text-base font-bold shadow-lg gap-2">
-			<Sparkles class="h-4 w-4" /> Забронировать онлайн
-		</Button>
-		<p class="text-center text-[11px] text-muted-foreground">
-			Оплата происходит после подтверждения бронирования арендодателем
-		</p>
+		<button
+			type="button"
+			onclick={oncontact}
+			class="w-full py-3.5 px-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs sm:text-sm transition-all cursor-pointer shadow-xs active:scale-[0.99] text-center block"
+		>
+			Связаться с хозяином
+		</button>
 	{:else}
-		<div class="space-y-2">
-			<Button onclick={onpublish} class="w-full h-12 text-base font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg gap-2">
+		<div class="space-y-2 pt-1">
+			<Button onclick={onpublish} class="w-full h-11 text-xs sm:text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs gap-2">
 				<Send class="h-4 w-4" /> Опубликовать
 			</Button>
-			<Button variant="outline" onclick={onedit} class="w-full gap-2">
-				<ArrowLeft class="h-4 w-4" /> Вернуться к редактированию
+			<Button variant="outline" onclick={onedit} class="w-full h-10 text-xs gap-2">
+				<ArrowLeft class="h-3.5 w-3.5" /> Вернуться к редактированию
 			</Button>
 		</div>
 	{/if}

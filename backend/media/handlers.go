@@ -4,6 +4,7 @@ package media
 import (
 	"io"
 	"net/http"
+	"strings"
 
 	"flickey/go-backend/auth"
 
@@ -165,13 +166,34 @@ func (h *Handler) DevGet(c *gin.Context) {
 		fileKey = fileKey[1:]
 	}
 
-	data, err := h.Service.Storage.GetObjectBytes(c.Request.Context(), fileKey, 50*1024*1024)
+	maxSize := 110 * 1024 * 1024 // 110 MB
+	data, err := h.Service.Storage.GetObjectBytes(c.Request.Context(), fileKey, maxSize)
 	if err != nil || len(data) == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"code": "FILE_NOT_FOUND", "message": "File not found in storage."})
 		return
 	}
 
-	contentType := http.DetectContentType(data)
+	contentType := "application/octet-stream"
+	lowerKey := strings.ToLower(fileKey)
+	switch {
+	case strings.HasSuffix(lowerKey, ".mp4"):
+		contentType = "video/mp4"
+	case strings.HasSuffix(lowerKey, ".mov"):
+		contentType = "video/quicktime"
+	case strings.HasSuffix(lowerKey, ".webm"):
+		contentType = "video/webm"
+	case strings.HasSuffix(lowerKey, ".pdf"):
+		contentType = "application/pdf"
+	case strings.HasSuffix(lowerKey, ".jpg") || strings.HasSuffix(lowerKey, ".jpeg"):
+		contentType = "image/jpeg"
+	case strings.HasSuffix(lowerKey, ".png"):
+		contentType = "image/png"
+	case strings.HasSuffix(lowerKey, ".webp"):
+		contentType = "image/webp"
+	default:
+		contentType = http.DetectContentType(data)
+	}
+
 	c.Data(http.StatusOK, contentType, data)
 }
 

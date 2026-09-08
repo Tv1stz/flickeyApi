@@ -40,5 +40,32 @@ export const mediaApi = {
 		return apiRequest<CompleteMediaResponse>(`/media/${mediaId}/complete`, {
 			method: 'POST'
 		});
+	},
+
+	/**
+	 * Helper: Upload a file (image, video, document) through presign -> direct upload -> complete.
+	 */
+	async uploadFile(file: File): Promise<{ mediaId: string; fileKey: string }> {
+		const contentType = file.type || 'application/octet-stream';
+		const presign = await this.presign({
+			content_type: contentType,
+			file_size_bytes: file.size
+		});
+		await this.uploadDirect(presign.upload_url, file, contentType);
+		const complete = await this.complete(presign.media_id);
+		return {
+			mediaId: complete.media_id,
+			fileKey: complete.file_key
+		};
+	},
+
+	/**
+	 * Resolve full public URL for a media file key.
+	 */
+	getMediaUrl(fileKey?: string): string {
+		if (!fileKey) return '';
+		if (fileKey.startsWith('http://') || fileKey.startsWith('https://')) return fileKey;
+		return `http://localhost:8000/api/v1/media/dev-upload/${fileKey.replace(/^\/+/, '')}`;
 	}
 };
+

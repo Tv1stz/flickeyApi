@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { resolveAmenity } from '$lib/config/amenities';
 
 /**
  * Merge class names with Tailwind CSS conflict resolution.
@@ -82,12 +83,20 @@ export function translateListingStatus(status: string): { label: string; color: 
  * Complete authoritative Russian translation dictionary for all amenity IDs.
  */
 export function translateAmenity(id: string): string {
+	if (!id) return '';
+	const resolved = resolveAmenity(id);
+	if (resolved && resolved.label && resolved.label.toLowerCase() !== id.toLowerCase()) {
+		return resolved.label;
+	}
+
 	const map: Record<string, string> = {
-		// Basic
+		// Basic & Essentials
 		wifi: 'Скоростной Wi-Fi',
 		heating: 'Отопление',
+		ac: 'Кондиционер',
 		air_conditioning: 'Кондиционер',
 		hot_water: 'Горячая вода',
+		washer: 'Стиральная машина',
 		washing_machine: 'Стиральная машина',
 		dryer: 'Сушильная машина',
 		tv: 'Телевизор / Smart TV',
@@ -97,7 +106,9 @@ export function translateAmenity(id: string): string {
 		bed_linen: 'Постельное белье',
 
 		// Kitchen
+		kitchen: 'Полноценная кухня',
 		full_kitchen: 'Полноценная кухня',
+		fridge: 'Холодильник',
 		refrigerator: 'Холодильник',
 		stove: 'Плита',
 		oven: 'Духовка',
@@ -120,14 +131,22 @@ export function translateAmenity(id: string): string {
 		external_monitor: 'Внешний монитор',
 
 		// Comfort and Leisure
+		balcony: 'Балкон',
+		terrace: 'Терраса',
 		balcony_terrace: 'Балкон / терраса',
 		gym: 'Тренажерный зал',
 		great_view: 'Красивый вид',
 		sofa_lounge: 'Диван / зона отдыха',
 		board_games: 'Настольные игры',
 		books: 'Книги',
+		bbq: 'Зона барбекю',
+		sauna: 'Сауна / Баня',
+		pool: 'Бассейн',
+		jacuzzi: 'Джакузи',
+		fireplace: 'Камин',
 
 		// Family
+		crib: 'Детская кроватка',
 		baby_crib: 'Детская кроватка',
 		high_chair: 'Стульчик для кормления',
 		pets_allowed: 'Можно с питомцами',
@@ -135,16 +154,21 @@ export function translateAmenity(id: string): string {
 		baby_bath: 'Детская ванночка',
 
 		// Safety
+		smoke_alarm: 'Датчик дыма',
 		smoke_detector: 'Датчик дыма',
 		carbon_monoxide_detector: 'Датчик угарного газа',
 		fire_extinguisher: 'Огнетушитель',
+		first_aid: 'Аптечка',
 		first_aid_kit: 'Аптечка',
+		cctv: 'Камеры видеонаблюдения',
 		safe: 'Сейф',
 
 		// Access and Parking
+		self_checkin: 'Бесконтактное заселение',
 		self_check_in: 'Бесконтактное заселение',
 		elevator: 'Лифт',
-		parking: 'Парковка',
+		parking: 'Бесплатная парковка',
+		paid_parking: 'Платная парковка',
 		ev_charger: 'Зарядка для электромобилей',
 
 		// Accessibility
@@ -152,7 +176,7 @@ export function translateAmenity(id: string): string {
 		step_free_entrance: 'Вход без ступеней',
 		accessible_bathroom: 'Оборудованная ванная комната'
 	};
-	return map[id] || id;
+	return map[id] || map[id.toLowerCase()] || resolved?.label || id;
 }
 
 /**

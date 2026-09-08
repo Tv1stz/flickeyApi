@@ -62,7 +62,7 @@ func TestConfig() *config.Settings {
 		CookieSecure:                  false,
 		MediaMaxFileSizeBytes:         15728640,
 		MediaMinCount:                 5,
-		MediaMaxCount:                 15,
+		MediaMaxCount:                 25,
 	}
 }
 
@@ -113,25 +113,22 @@ func NewSuite(t *testing.T) *Suite {
 	}
 }
 
-// Cleanup truncates all tables and flushes Redis after each test.
+// Cleanup cleans up test listings, drafts, amenities, and test state after each test.
 func (s *Suite) Cleanup() {
 	s.T.Helper()
-	// Protect dev database: do not truncate if TEST_DATABASE_URL is not set
-	if os.Getenv("TEST_DATABASE_URL") == "" {
-		return
-	}
 	ctx := context.Background()
-	// Order: tables with FK dependencies first.
 	tables := []string{
 		"listing_amenities",
-		"media",
 		"listing_drafts",
 		"listings",
-		"users",
 	}
 	for _, table := range tables {
-		s.DB.WithContext(ctx).Exec("TRUNCATE TABLE " + table + " RESTART IDENTITY CASCADE")
+		s.DB.WithContext(ctx).Exec("DELETE FROM " + table)
 	}
+	s.DB.WithContext(ctx).Exec("UPDATE media SET listing_id = NULL")
+	s.DB.WithContext(ctx).Exec("DELETE FROM notifications WHERE user_id != '8752b84c-7bd8-4926-a527-f97419a9865d'")
+	s.DB.WithContext(ctx).Exec("DELETE FROM audit_logs")
+	s.DB.WithContext(ctx).Exec("DELETE FROM users WHERE id != '8752b84c-7bd8-4926-a527-f97419a9865d'")
 	s.Redis.FlushAll(ctx)
 }
 

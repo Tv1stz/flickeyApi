@@ -1,5 +1,5 @@
 export interface PresignMediaRequest {
-	content_type: 'image/jpeg' | 'image/png' | 'image/webp';
+	content_type: 'image/jpeg' | 'image/png' | 'image/webp' | 'video/mp4' | 'video/quicktime' | 'video/webm' | 'application/pdf' | string;
 	file_size_bytes: number;
 }
 

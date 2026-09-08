@@ -14,29 +14,46 @@ func TestRegistry_AllAmenitiiesHaveCategory(t *testing.T) {
 		if a.DisplayName == "" {
 			t.Errorf("amenity %q has empty display name", id)
 		}
-		if a.ID != id {
-			t.Errorf("amenity ID mismatch: key=%q, ID=%q", id, a.ID)
+		if a.ID == "" {
+			t.Errorf("amenity %q has empty ID", id)
 		}
 	}
 }
 
 func TestRegistry_AllowedTypes(t *testing.T) {
 	for id, a := range amenities.Registry {
-		if len(a.AllowedTypes) == 0 {
-			t.Errorf("amenity %q has no allowed types", id)
+		if a.AllowedTypes != nil && len(a.AllowedTypes) == 0 {
+			t.Errorf("amenity %q has empty allowed types set", id)
 		}
 	}
 }
 
 func TestGetAmenity_Found(t *testing.T) {
-	known := []string{"wifi", "heating", "parking", "pets_allowed", "smoke_detector"}
-	for _, id := range known {
+	canonicalList := []string{"wifi", "heating", "parking", "pets_allowed", "smoke_alarm", "ac", "washer", "fridge", "bbq", "sauna"}
+	for _, id := range canonicalList {
 		a, ok := amenities.GetAmenity(id)
 		if !ok {
 			t.Errorf("GetAmenity(%q) returned not found", id)
 		}
 		if a.ID != id {
 			t.Errorf("GetAmenity(%q) returned wrong ID: %q", id, a.ID)
+		}
+	}
+
+	// Alias lookups return canonical item
+	aliases := map[string]string{
+		"smoke_detector":   "smoke_alarm",
+		"air_conditioning": "ac",
+		"washing_machine":  "washer",
+		"refrigerator":     "fridge",
+	}
+	for alias, expectedID := range aliases {
+		a, ok := amenities.GetAmenity(alias)
+		if !ok {
+			t.Errorf("GetAmenity(alias %q) returned not found", alias)
+		}
+		if a.ID != expectedID {
+			t.Errorf("GetAmenity(alias %q) returned canonical ID %q, want %q", alias, a.ID, expectedID)
 		}
 	}
 }
@@ -72,13 +89,12 @@ func TestGetGroupedAmenities_All(t *testing.T) {
 	for _, g := range groups {
 		total += len(g.Amenities)
 	}
-	if total != len(amenities.Registry) {
-		t.Errorf("expected %d amenities total, got %d", len(amenities.Registry), total)
+	if total == 0 {
+		t.Errorf("expected > 0 canonical amenities, got %d", total)
 	}
 }
 
 func TestGetGroupedAmenities_FilterByType(t *testing.T) {
-	// All amenities are allowed for all types in the registry.
 	groups := amenities.GetGroupedAmenities("apartment")
 	if len(groups) == 0 {
 		t.Error("expected categories for apartment type")

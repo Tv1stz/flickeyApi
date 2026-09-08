@@ -46,32 +46,29 @@ export default {
 					DEFAULT: 'hsl(var(--card))',
 					foreground: 'hsl(var(--card-foreground))'
 				},
-				brand: {
-					50: '#f0fdfa',
-					100: '#ccfbf1',
-					200: '#99f6e4',
-					300: '#5eead4',
-					400: '#2dd4bf',
-					500: '#14b8a6',
-					600: '#0d9488',
-					700: '#0f766e',
-					800: '#115e59',
-					900: '#134e4a',
-					950: '#042f2e'
+				sidebar: {
+					DEFAULT: 'hsl(var(--sidebar))',
+					foreground: 'hsl(var(--sidebar-foreground))',
+					primary: 'hsl(var(--sidebar-primary))',
+					'primary-foreground': 'hsl(var(--sidebar-primary-foreground))',
+					accent: 'hsl(var(--sidebar-accent))',
+					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
+					border: 'hsl(var(--sidebar-border))',
+					ring: 'hsl(var(--sidebar-ring))'
 				}
 			},
 			borderRadius: {
+				xl: 'calc(var(--radius) + 4px)',
 				lg: 'var(--radius)',
 				md: 'calc(var(--radius) - 2px)',
 				sm: 'calc(var(--radius) - 4px)'
 			},
 			fontFamily: {
 				sans: [
-					'Inter',
+					'Onest',
+					'system-ui',
 					'-apple-system',
 					'BlinkMacSystemFont',
-					'"Segoe UI"',
-					'Roboto',
 					'sans-serif'
 				]
 			}

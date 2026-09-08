@@ -86,6 +86,12 @@ func formatAdminListing(l *db.Listing, uploadBaseURL string) gin.H {
 		mediaList[i] = m.PublicURL(uploadBaseURL)
 	}
 
+	var verificationVideoURL *string
+	if l.VerificationVideo != nil {
+		u := l.VerificationVideo.PublicURL(uploadBaseURL)
+		verificationVideoURL = &u
+	}
+
 	var hostMap gin.H
 	if l.Host != nil {
 		hostName := l.Host.Phone
@@ -107,12 +113,20 @@ func formatAdminListing(l *db.Listing, uploadBaseURL string) gin.H {
 	}
 
 	return gin.H{
-		"id":               l.ID,
-		"host_id":          l.HostID,
-		"host":             hostMap,
-		"status":           l.Status,
+		"id":                     l.ID,
+		"host_id":                l.HostID,
+		"host":                   hostMap,
+		"verification_video_url": verificationVideoURL,
+		"verification_video_id":  l.VerificationVideoID,
+		"status":                 l.Status,
 		"type":             l.Type,
 		"name":             l.Name,
+		"address":          l.Address,
+		"city":             l.City,
+		"street":           l.Street,
+		"house_number":     l.HouseNumber,
+		"latitude":         l.Latitude,
+		"longitude":        l.Longitude,
 		"square":           l.Square,
 		"floor":            l.Floor,
 		"total_floors":     l.TotalFloors,

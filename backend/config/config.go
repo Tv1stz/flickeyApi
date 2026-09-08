@@ -24,6 +24,9 @@ type Settings struct {
 	// Geocoder (Photon OSM)
 	GeocoderURL string `env:"GEOCODER_URL" env-default:"http://localhost:2322"`
 
+	// TileServer (TileServer GL)
+	TileServerURL string `env:"TILESERVER_URL" env-default:"http://localhost:8081"`
+
 	// JWT
 	JWTSecret            string `env:"JWT_SECRET"`
 	JWTAlgorithm         string `env:"JWT_ALGORITHM" env-default:"HS256"`
@@ -54,9 +57,10 @@ type Settings struct {
 	S3PresignedURLTTL int    `env:"S3_PRESIGNED_URL_TTL_SECONDS" env-default:"300"`
 
 	// Media constraints
-	MediaMaxFileSizeBytes int `env:"MEDIA_MAX_FILE_SIZE_BYTES" env-default:"15728640"` // 15 MB
-	MediaMinCount         int `env:"MEDIA_MIN_COUNT" env-default:"5"`
-	MediaMaxCount         int `env:"MEDIA_MAX_COUNT" env-default:"15"`
+	MediaMaxFileSizeBytes      int `env:"MEDIA_MAX_FILE_SIZE_BYTES" env-default:"15728640"`       // 15 MB (images)
+	MediaVideoMaxFileSizeBytes int `env:"MEDIA_VIDEO_MAX_FILE_SIZE_BYTES" env-default:"104857600"` // 100 MB (videos / documents)
+	MediaMinCount              int `env:"MEDIA_MIN_COUNT" env-default:"5"`
+	MediaMaxCount              int `env:"MEDIA_MAX_COUNT" env-default:"25"`
 
 	// Derived (parsed from raw)
 	AllowedRedirectHosts []string `env:"-"`

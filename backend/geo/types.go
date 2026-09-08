@@ -17,6 +17,11 @@ type GeoSuggestResponse struct {
 	Results []GeoSuggestItem `json:"results"`
 }
 
+// GeoReverseResponse represents the reverse geocoding result for geographic coordinates.
+type GeoReverseResponse struct {
+	Item *GeoSuggestItem `json:"item"`
+}
+
 // PhotonFeatureCollection represents the raw GeoJSON returned by Photon.
 type PhotonFeatureCollection struct {
 	Features []PhotonFeature `json:"features"`
@@ -47,4 +52,34 @@ type PhotonProperties struct {
 // PhotonGeometry holds the coordinates in [longitude, latitude] format.
 type PhotonGeometry struct {
 	Coordinates []float64 `json:"coordinates"` // [lon, lat]
+}
+
+// NominatimFeatureCollection represents the GeoJSON returned by OpenStreetMap Nominatim.
+type NominatimFeatureCollection struct {
+	Features []NominatimFeature `json:"features"`
+}
+
+// NominatimFeature represents a single feature in Nominatim GeoJSON.
+type NominatimFeature struct {
+	Properties NominatimProperties `json:"properties"`
+	Geometry   PhotonGeometry      `json:"geometry"`
+}
+
+// NominatimProperties contains address details from Nominatim.
+type NominatimProperties struct {
+	DisplayName string           `json:"display_name"`
+	Name        string           `json:"name"`
+	Address     NominatimAddress `json:"address"`
+}
+
+// NominatimAddress contains granular address components from Nominatim.
+type NominatimAddress struct {
+	Country     string `json:"country"`
+	City        string `json:"city"`
+	Town        string `json:"town"`
+	Village     string `json:"village"`
+	Road        string `json:"road"`
+	HouseNumber string `json:"house_number"`
+	State       string `json:"state"`
+	Postcode    string `json:"postcode"`
 }

@@ -1,72 +1,183 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { page } from '$app/state';
-	import { LayoutDashboard, Building2, ShieldCheck, Users, AlertTriangle, FileText } from 'lucide-svelte';
+	import { resolve } from '$app/paths';
+	import {
+		LayoutDashboard,
+		Building2,
+		ShieldCheck,
+		Users,
+		AlertTriangle,
+		FileText,
+		ArrowUpRight,
+		Compass,
+		Home,
+		User
+	} from 'lucide-svelte';
+	import { adminOverviewApi } from '$lib/api/admin/overview';
+	import { authStore } from '$lib/stores/authStore.svelte';
+	import type { AdminOverviewMetrics } from '$lib/types/admin';
 
-	const navItems = [
-		{ href: '/admin', label: 'Обзор', icon: LayoutDashboard, exact: true },
-		{ href: '/admin/listings', label: 'Модерация жилья', icon: Building2, exact: false },
-		{ href: '/admin/verification', label: 'Верификация', icon: ShieldCheck, exact: false },
-		{ href: '/admin/users', label: 'Пользователи', icon: Users, exact: false },
-		{ href: '/admin/reports', label: 'Жалобы', icon: AlertTriangle, exact: false },
-		{ href: '/admin/audit', label: 'Аудит действий', icon: FileText, exact: false }
-	];
+	let metrics = $state<AdminOverviewMetrics | null>(null);
+
+	onMount(() => {
+		adminOverviewApi
+			.getOverview()
+			.then((res) => {
+				metrics = res;
+			})
+			.catch(() => {
+				// Metrics fail silently in nav
+			});
+	});
+
+	const navItems = $derived([
+		{ href: '/admin', label: 'Дашборд', icon: LayoutDashboard, exact: true, count: 0 },
+		{
+			href: '/admin/listings',
+			label: 'Жилье',
+			icon: Building2,
+			exact: false,
+			count: metrics?.pending_listings || 0,
+			badgeColor: 'bg-amber-500 text-white'
+		},
+		{
+			href: '/admin/verification',
+			label: 'Верификация',
+			icon: ShieldCheck,
+			exact: false,
+			count: metrics?.pending_verifications || 0,
+			badgeColor: 'bg-blue-500 text-white'
+		},
+		{ href: '/admin/users', label: 'Пользователи', icon: Users, exact: false, count: 0 },
+		{
+			href: '/admin/reports',
+			label: 'Жалобы',
+			icon: AlertTriangle,
+			exact: false,
+			count: metrics?.open_reports || 0,
+			badgeColor: 'bg-rose-500 text-white'
+		},
+		{ href: '/admin/audit', label: 'Аудит', icon: FileText, exact: false, count: 0 }
+	]);
 
 	function isActive(href: string, exact: boolean): boolean {
 		const path = page.url.pathname;
 		if (exact) {
 			return path === href;
 		}
-		return path.startsWith(href);
+		return path === href || path.startsWith(href + '/');
 	}
 </script>
 
-<nav class="bg-card border-b border-border shadow-xs">
-	<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-		<div class="flex items-center justify-between h-16">
+<header class="sticky top-0 z-40 w-full border-b border-zinc-200/80 bg-white/90 backdrop-blur-md dark:border-border dark:bg-card/90 shadow-2xs">
+	<div class="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8">
+		<div class="flex h-16 items-center justify-between gap-4">
+			<!-- Brand & Badge -->
 			<div class="flex items-center gap-6">
-				<div class="flex items-center gap-2">
-					<div class="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold text-lg">
+				<a href="/admin" class="group flex items-center gap-2.5 transition active:scale-98">
+					<div class="flex h-9 w-9 items-center justify-center rounded-2xl bg-zinc-900 text-sm font-black text-white shadow-sm dark:bg-white dark:text-zinc-900">
 						F
 					</div>
-					<span class="font-bold text-lg text-foreground tracking-tight">Flickey Admin</span>
-					<span class="text-[10px] font-semibold uppercase bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 px-2 py-0.5 rounded-full">
-						Compliance
-					</span>
-				</div>
+					<div class="flex flex-col">
+						<div class="flex items-center gap-1.5">
+							<span class="text-base font-extrabold tracking-tight text-zinc-900 dark:text-foreground">Flickey</span>
+							<span class="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-zinc-700 dark:bg-muted dark:text-muted-foreground">
+								Admin
+							</span>
+						</div>
+					</div>
+				</a>
 
-				<div class="hidden md:flex items-center space-x-1">
+				<!-- Desktop Main Navigation -->
+				<nav class="hidden lg:flex items-center gap-1">
 					{#each navItems as item}
 						{@const active = isActive(item.href, item.exact)}
 						{@const Icon = item.icon}
 						<a
 							href={item.href}
-							class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors {active
-								? 'bg-primary text-primary-foreground font-semibold shadow-xs'
-								: 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}"
+							class="group relative flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all {active
+								? 'bg-zinc-900 text-white shadow-xs dark:bg-white dark:text-zinc-900'
+								: 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-muted-foreground dark:hover:bg-muted dark:hover:text-foreground'}"
 						>
-							<Icon class="h-4 w-4 shrink-0" />
+							<Icon class="h-4 w-4 shrink-0 transition group-hover:scale-110" />
 							<span>{item.label}</span>
+
+							{#if item.count > 0}
+								<span
+									class="flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none shadow-xs {active
+										? 'bg-white text-zinc-900 dark:bg-zinc-900 dark:text-white'
+										: item.badgeColor}"
+								>
+									{item.count}
+								</span>
+							{/if}
 						</a>
 					{/each}
-				</div>
+				</nav>
+			</div>
+
+			<!-- Right Controls: Quick Navigation to Userland / Catalog -->
+			<div class="flex items-center gap-2">
+				<a
+					href="/host/listings"
+					class="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-zinc-200/80 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 shadow-2xs transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-95 dark:border-border dark:bg-card dark:text-muted-foreground dark:hover:text-foreground"
+					title="Перейти в кабинет хозяина"
+				>
+					<Home class="h-3.5 w-3.5 text-zinc-500" />
+					<span>Мои объекты</span>
+				</a>
+
+				<a
+					href="/search"
+					class="inline-flex items-center gap-1.5 rounded-full border border-zinc-200/80 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 shadow-2xs transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-95 dark:border-border dark:bg-card dark:text-muted-foreground dark:hover:text-foreground"
+					title="Перейти в каталог сайта"
+				>
+					<Compass class="h-3.5 w-3.5 text-zinc-500" />
+					<span>Каталог</span>
+				</a>
+
+				<!-- Profile Info Pill -->
+				{#if authStore.user}
+					<a
+						href="/profile"
+						class="flex items-center gap-2 rounded-full border border-zinc-200/80 bg-zinc-50/80 px-2.5 py-1 text-xs font-semibold text-zinc-900 shadow-2xs transition hover:border-zinc-300 hover:bg-zinc-100 active:scale-95 dark:border-border dark:bg-muted dark:text-foreground"
+					>
+						<div class="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-900 text-[10px] font-bold text-white dark:bg-white dark:text-zinc-900">
+							A
+						</div>
+						<span class="hidden md:inline text-[11px] font-mono">
+							{authStore.user.phone ? authStore.user.phone.slice(-4) : 'Admin'}
+						</span>
+					</a>
+				{/if}
 			</div>
 		</div>
 
-		<!-- Mobile navigation sub-bar -->
-		<div class="md:hidden flex items-center space-x-1 overflow-x-auto pb-3 pt-1 scrollbar-none">
+		<!-- Mobile/Tablet Sub-Navigation Bar -->
+		<div class="lg:hidden flex items-center gap-1.5 overflow-x-auto pb-2.5 pt-0.5 scrollbar-none">
 			{#each navItems as item}
 				{@const active = isActive(item.href, item.exact)}
 				{@const Icon = item.icon}
 				<a
 					href={item.href}
-					class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors {active
-						? 'bg-primary text-primary-foreground font-semibold'
-						: 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}"
+					class="flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold transition-all {active
+						? 'bg-zinc-900 text-white shadow-xs dark:bg-white dark:text-zinc-900'
+						: 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-muted-foreground dark:hover:bg-muted dark:hover:text-foreground'}"
 				>
 					<Icon class="h-3.5 w-3.5 shrink-0" />
 					<span>{item.label}</span>
+					{#if item.count > 0}
+						<span
+							class="flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none {active
+								? 'bg-white text-zinc-900 dark:bg-zinc-900 dark:text-white'
+								: item.badgeColor}"
+						>
+							{item.count}
+						</span>
+					{/if}
 				</a>
 			{/each}
 		</div>
 	</div>
-</nav>
+</header>

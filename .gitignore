@@ -15,5 +15,14 @@ node_modules/
 build/
 dist/
 photon_data/
+tileserver_data/
 tmp/
 *.log
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+Thumbs.db
+.DS_Store
+backend/local-storage/

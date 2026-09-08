@@ -770,6 +770,13 @@ When debugging, do not waste time suspecting `go run`, `go build`, `go test`, or
 - Re-read the error message carefully. Go's error messages are accurate.
 - Confirm the file you edited is actually the file being compiled (`go list -f '{{.GoFiles}}' .`).
 - Add a `fmt.Println` or `t.Log` at the exact site to verify execution reaches it.
-- Check that all call sites of a changed function were updated.
-
 Do not suggest clearing the build cache (`go clean -cache`), restarting the Go toolchain, or any other tool-level intervention before first exhausting all code-level explanations. The tool is not lying to you.
+
+## REST & HTTP API Client Synchronization
+
+When developing Go backends paired with modern SPA/SvelteKit frontends:
+
+1. **Explicit JSON Tags Everywhere:** Every struct field intended for JSON serialization MUST have an explicit `json:"snake_case_name"` tag. Never return raw internal models without JSON tags.
+2. **Idempotency on Critical Mutations:** When creating or submitting high-value resources (e.g., publishing listings, processing payments), require and validate the `Idempotency-Key` header (UUIDv4) using Redis/cache locking.
+3. **Presigned Upload Architecture:** Never proxy large media files through backend memory. Use presigned S3/Storage URLs with server-side validation and completion hooks.
+4. **Stable API Contracts:** When frontend needs changes, prefer client-side DTO adapters rather than introducing breaking changes to established Go API endpoints.

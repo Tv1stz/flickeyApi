@@ -1,5 +1,5 @@
 import { apiRequest } from './client';
-import type { GeoSuggestItem, GeoSuggestResponse } from '$lib/types/geo';
+import type { GeoSuggestItem, GeoSuggestResponse, GeoReverseResponse } from '$lib/types/geo';
 
 export const geoApi = {
 	/**
@@ -34,6 +34,36 @@ export const geoApi = {
 			}
 			console.warn('Geocoding request failed:', err);
 			return [];
+		}
+	},
+
+	/**
+	 * Reverse geocode latitude and longitude into a formatted Russian address.
+	 * Calls GET /api/v1/geo/reverse?lat={lat}&lon={lon}&lang={lang}
+	 */
+	async reverse(
+		lat: number,
+		lon: number,
+		lang: string = 'ru',
+		signal?: AbortSignal
+	): Promise<GeoSuggestItem | null> {
+		const params = new URLSearchParams();
+		params.set('lat', lat.toString());
+		params.set('lon', lon.toString());
+		if (lang) params.set('lang', lang);
+
+		try {
+			const res = await apiRequest<GeoReverseResponse>(`/geo/reverse?${params.toString()}`, {
+				method: 'GET',
+				signal
+			});
+			return res?.item || null;
+		} catch (err) {
+			if (err instanceof DOMException && err.name === 'AbortError') {
+				return null;
+			}
+			console.warn('Reverse geocoding request failed:', err);
+			return null;
 		}
 	}
 };

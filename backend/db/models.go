@@ -83,10 +83,18 @@ func (m *Media) PublicURL(uploadBaseURL string) string {
 type ListingDraft struct {
 	ID              uuid.UUID      `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
 	HostID          uuid.UUID      `gorm:"type:uuid;not null;index:ix_listing_drafts_host_id" json:"host_id"`
+	SourceListingID *uuid.UUID     `gorm:"type:uuid;index:ix_listing_drafts_source_listing_id" json:"source_listing_id,omitempty"`
+	Mode            string         `gorm:"type:varchar(20);not null;default:'create'" json:"mode"` // create | edit
 	CurrentStep     int            `gorm:"not null;default:1;check:ck_listing_drafts_current_step_range,current_step >= 1 AND current_step <= 6" json:"current_step"`
 	Status          string         `gorm:"type:varchar(50);not null;default:'draft';index:ix_listing_drafts_status" json:"status"`
 	Type            *string        `gorm:"type:varchar(50)" json:"type"`
 	Name            *string        `gorm:"type:varchar(100)" json:"name"`
+	Address         *string        `gorm:"type:text" json:"address"`
+	City            *string        `gorm:"type:varchar(100)" json:"city"`
+	Street          *string        `gorm:"type:varchar(150)" json:"street"`
+	HouseNumber     *string        `gorm:"type:varchar(50)" json:"house_number"`
+	Latitude        *float64       `gorm:"type:numeric(10,6)" json:"latitude"`
+	Longitude       *float64       `gorm:"type:numeric(10,6)" json:"longitude"`
 	Square          *float64       `gorm:"type:numeric(10,2)" json:"square"`
 	Floor           *int           `gorm:"type:integer" json:"floor"`
 	TotalFloors     *int           `gorm:"type:integer" json:"total_floors"`
@@ -94,9 +102,10 @@ type ListingDraft struct {
 	RoomsCount      *int           `gorm:"type:integer" json:"rooms_count"`
 	BedsCount       *int           `gorm:"type:integer" json:"beds_count"`
 	BathroomsCount  *int           `gorm:"type:integer" json:"bathrooms_count"`
-	MediaIDs        datatypes.JSON `gorm:"type:json" json:"media_ids"` // []string of UUID strings
-	Amenities       datatypes.JSON `gorm:"type:json" json:"amenities"` // []string of amenity IDs
-	PricePerNight   *float64       `gorm:"type:numeric(10,2)" json:"price_per_night"`
+	MediaIDs            datatypes.JSON `gorm:"type:json" json:"media_ids"` // []string of UUID strings
+	Amenities           datatypes.JSON `gorm:"type:json" json:"amenities"` // []string of amenity IDs
+	VerificationVideoID *uuid.UUID     `gorm:"type:uuid" json:"verification_video_id,omitempty"`
+	PricePerNight       *float64       `gorm:"type:numeric(10,2)" json:"price_per_night"`
 	Currency        *string        `gorm:"type:varchar(10)" json:"currency"`
 	MinNights       *int           `gorm:"type:integer" json:"min_nights"`
 	CheckinFrom     *string        `gorm:"type:time" json:"checkin_from"`  // stored as "HH:MM:SS"
@@ -122,6 +131,12 @@ type Listing struct {
 	Status          string    `gorm:"type:varchar(50);not null;default:'pending_review';index:ix_listings_status" json:"status"`
 	Type            string    `gorm:"type:varchar(50);not null" json:"type"`
 	Name            string    `gorm:"type:varchar(100);not null" json:"name"`
+	Address         string    `gorm:"type:text;not null;default:''" json:"address"`
+	City            string    `gorm:"type:varchar(100);not null;default:'';index:ix_listings_city" json:"city"`
+	Street          string    `gorm:"type:varchar(150);not null;default:''" json:"street"`
+	HouseNumber     string    `gorm:"type:varchar(50);not null;default:''" json:"house_number"`
+	Latitude        float64   `gorm:"type:numeric(10,6);not null;default:0;index:ix_listings_lat_lng" json:"latitude"`
+	Longitude       float64   `gorm:"type:numeric(10,6);not null;default:0" json:"longitude"`
 	Square          float64   `gorm:"type:numeric(10,2);not null" json:"square"`
 	Floor           int       `gorm:"not null" json:"floor"`
 	TotalFloors     int       `gorm:"not null" json:"total_floors"`
@@ -144,10 +159,13 @@ type Listing struct {
 	CreatedAt       time.Time `gorm:"type:timestamptz;not null;default:now()" json:"created_at"`
 	UpdatedAt       time.Time `gorm:"type:timestamptz;not null;default:now();autoUpdateTime" json:"updated_at"`
 
+	VerificationVideoID *uuid.UUID `gorm:"type:uuid;index:ix_listings_verification_video_id" json:"verification_video_id,omitempty"`
+
 	// Relationships
-	Host             *User            `gorm:"foreignKey:HostID" json:"host,omitempty"`
-	ListingAmenities []ListingAmenity `gorm:"foreignKey:ListingID;constraint:OnDelete:CASCADE" json:"listing_amenities,omitempty"`
-	Media            []Media          `gorm:"foreignKey:ListingID;constraint:OnDelete:SET NULL" json:"media,omitempty"`
+	Host              *User            `gorm:"foreignKey:HostID" json:"host,omitempty"`
+	ListingAmenities  []ListingAmenity `gorm:"foreignKey:ListingID;constraint:OnDelete:CASCADE" json:"listing_amenities,omitempty"`
+	Media             []Media          `gorm:"foreignKey:ListingID;constraint:OnDelete:SET NULL" json:"media,omitempty"`
+	VerificationVideo *Media           `gorm:"foreignKey:VerificationVideoID;constraint:OnDelete:SET NULL" json:"verification_video,omitempty"`
 }
 
 func (Listing) TableName() string { return "listings" }
@@ -191,6 +209,7 @@ type VerificationRequest struct {
 	RejectionReason  string         `gorm:"type:varchar(255)" json:"rejection_reason"`
 	AdminNote        string         `gorm:"type:text" json:"admin_note"`
 	RequestedChanges datatypes.JSON `gorm:"type:json" json:"requested_changes"`
+	Requisites       datatypes.JSON `gorm:"type:json" json:"requisites"`
 	Documents        datatypes.JSON `gorm:"type:json" json:"documents"`
 	CreatedAt        time.Time      `gorm:"type:timestamptz;not null;default:now()" json:"created_at"`
 	UpdatedAt        time.Time      `gorm:"type:timestamptz;not null;default:now();autoUpdateTime" json:"updated_at"`

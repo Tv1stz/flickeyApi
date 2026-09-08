@@ -2,15 +2,42 @@ import { goto } from '$app/navigation';
 import { authApi } from '$lib/api/auth';
 import { setAccessToken, getAccessToken } from '$lib/api/client';
 import { notifications } from '$lib/stores/notifications.svelte';
+import { authStore, type User as StoreUser } from '$lib/stores/authStore.svelte';
 import type { User, UserRole } from '$lib/types/auth';
+
+function backendUserToStoreUser(user: User): StoreUser {
+	const roles: ('guest' | 'host' | 'admin')[] = ['guest'];
+	if (user.role === 'host') {
+		roles.push('host');
+	} else if (user.role === 'admin') {
+		roles.push('host', 'admin');
+	}
+	return {
+		id: user.id,
+		phone: user.phone,
+		name: user.first_name ? `${user.first_name}${user.last_name ? ' ' + user.last_name : ''}` : user.phone,
+		createdAt: user.created_at || new Date().toISOString(),
+		roles,
+		hostProfile: {
+			verificationStatus: 'verified',
+			listingsCount: 0
+		}
+	};
+}
 
 class AuthState {
 	// Svelte 5 Runes for reactive state
 	user = $state<User | null>(null);
 	accessToken = $state<string | null>(null);
-	activeContext = $state<'guest' | 'host'>('guest');
 	isLoading = $state<boolean>(true);
 	isInitialized = $state<boolean>(false);
+
+	get activeContext(): 'guest' | 'host' {
+		return authStore.viewMode;
+	}
+	set activeContext(context: 'guest' | 'host') {
+		authStore.setViewMode(context);
+	}
 
 	// Modal / Flow state
 	isAuthModalOpen = $state<boolean>(false);
@@ -44,6 +71,7 @@ class AuthState {
 				const user = await authApi.getMe().catch(() => null);
 				if (user) {
 					this.user = user;
+					authStore.setUser(backendUserToStoreUser(user));
 					this.syncActiveContext();
 					notifications.connect(token);
 					return;
@@ -59,6 +87,7 @@ class AuthState {
 				const user = await authApi.getMe().catch(() => null);
 				if (user) {
 					this.user = user;
+					authStore.setUser(backendUserToStoreUser(user));
 					this.syncActiveContext();
 				} else {
 					this.clearSession();
@@ -101,6 +130,7 @@ class AuthState {
 		this.setSession(res.access_token);
 		const user = await authApi.getMe();
 		this.user = user;
+		authStore.setUser(backendUserToStoreUser(user));
 		this.syncActiveContext();
 
 		if (user.status === 'pending_profile') {
@@ -124,6 +154,7 @@ class AuthState {
 		this.setSession(res.access_token);
 		const user = await authApi.getMe();
 		this.user = user;
+		authStore.setUser(backendUserToStoreUser(user));
 		this.activeContext = role === 'host' ? 'host' : 'guest';
 		this.closeAuthModal();
 	}
@@ -139,6 +170,7 @@ class AuthState {
 		});
 
 		this.user = updatedUser;
+		authStore.setUser(backendUserToStoreUser(updatedUser));
 		this.syncActiveContext();
 		this.closeAuthModal();
 	}
@@ -150,17 +182,15 @@ class AuthState {
 		if (context === 'host' && !this.isHost) {
 			return; // Cannot switch to host if not a host
 		}
-		this.activeContext = context;
+		authStore.setViewMode(context);
 	}
 
 	/**
 	 * Synchronize active context with server-authoritative role.
 	 */
 	private syncActiveContext(): void {
-		if (this.isHost && this.activeContext !== 'host') {
-			// Keep user in current context if valid, otherwise adjust
-		} else if (!this.isHost) {
-			this.activeContext = 'guest';
+		if (!this.isHost && authStore.viewMode === 'host') {
+			authStore.setViewMode('guest');
 		}
 	}
 
@@ -172,6 +202,7 @@ class AuthState {
 		try {
 			const user = await authApi.getMe();
 			this.user = user;
+			authStore.setUser(backendUserToStoreUser(user));
 			this.syncActiveContext();
 		} catch {
 			// Ignored if unauthenticated
@@ -221,6 +252,7 @@ class AuthState {
 		this.activeContext = 'guest';
 		setAccessToken(null);
 		notifications.disconnect();
+		authStore.logout();
 	}
 }
 

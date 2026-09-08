@@ -122,7 +122,7 @@
 			<span>Вход в панель администратора:</span>
 		</div>
 		<Button
-			variant="default"
+			variant="solid"
 			size="sm"
 			class="text-[11px] h-7 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shrink-0"
 			onclick={() => handleQuickLogin('admin')}

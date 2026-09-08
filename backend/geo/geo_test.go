@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+
+	"github.com/gin-gonic/gin"
 )
 
 func TestGeoSuggestItem_JSON_SnakeCase(t *testing.T) {
@@ -93,7 +96,7 @@ func TestTransformPhotonFeature(t *testing.T) {
 }
 
 func TestGeoService_ShortQueryReturnsEmpty(t *testing.T) {
-	svc := NewGeoService(nil, "http://localhost:2322", nil)
+	svc := NewGeoService(nil, "http://localhost:2322", "", nil)
 	resp, err := svc.Suggest(context.Background(), "a", "ru", 5)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -125,7 +128,7 @@ func TestGeoService_PhotonMockResponse(t *testing.T) {
 	}))
 	defer server.Close()
 
-	svc := NewGeoService(nil, server.URL, nil)
+	svc := NewGeoService(nil, server.URL, "", nil)
 	resp, err := svc.Suggest(context.Background(), "Ленина", "ru", 5)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -135,5 +138,93 @@ func TestGeoService_PhotonMockResponse(t *testing.T) {
 	}
 	if resp.Results[0].City != "Минск" || resp.Results[0].Street != "улица Ленина" {
 		t.Errorf("unexpected result: %+v", resp.Results[0])
+	}
+}
+
+func TestHandler_Tile_Validation(t *testing.T) {
+	svc := NewGeoService(nil, "", "", nil)
+	handler := NewHandler(svc)
+
+	tests := []struct {
+		name       string
+		path       string
+		wantStatus int
+		wantCode   string
+	}{
+		{
+			name:       "invalid zoom negative",
+			path:       "/tiles/-1/0/0",
+			wantStatus: http.StatusBadRequest,
+			wantCode:   "INVALID_TILE_COORDINATES",
+		},
+		{
+			name:       "invalid zoom excessive",
+			path:       "/tiles/20/0/0",
+			wantStatus: http.StatusBadRequest,
+			wantCode:   "INVALID_TILE_COORDINATES",
+		},
+		{
+			name:       "x coordinate out of bounds for z=2",
+			path:       "/tiles/2/4/0",
+			wantStatus: http.StatusBadRequest,
+			wantCode:   "TILE_OUT_OF_BOUNDS",
+		},
+		{
+			name:       "y coordinate out of bounds for z=2",
+			path:       "/tiles/2/0/4.png",
+			wantStatus: http.StatusBadRequest,
+			wantCode:   "TILE_OUT_OF_BOUNDS",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+
+			// Parse params from path
+			parts := strings.Split(strings.TrimPrefix(tt.path, "/tiles/"), "/")
+			c.Params = gin.Params{
+				{Key: "z", Value: parts[0]},
+				{Key: "x", Value: parts[1]},
+				{Key: "y", Value: parts[2]},
+			}
+			c.Request = httptest.NewRequest(http.MethodGet, tt.path, nil)
+
+			handler.Tile(c)
+
+			if w.Code != tt.wantStatus {
+				t.Fatalf("expected status %d, got %d. Body: %s", tt.wantStatus, w.Code, w.Body.String())
+			}
+
+			var body map[string]any
+			if err := json.Unmarshal(w.Body.Bytes(), &body); err == nil {
+				if code, ok := body["code"].(string); ok && code != tt.wantCode {
+					t.Errorf("expected error code %q, got %q", tt.wantCode, code)
+				}
+			}
+		})
+	}
+}
+
+func TestGeoService_ProxyTile_MockServer(t *testing.T) {
+	expectedPng := []byte{0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		w.WriteHeader(http.StatusOK)
+		w.Write(expectedPng)
+	}))
+	defer server.Close()
+
+	svc := NewGeoService(nil, "", server.URL, nil)
+	data, contentType, err := svc.ProxyTile(context.Background(), 2, 1, 1)
+	if err != nil {
+		t.Fatalf("unexpected ProxyTile error: %v", err)
+	}
+	if contentType != "image/png" {
+		t.Errorf("expected contentType image/png, got %q", contentType)
+	}
+	if len(data) != len(expectedPng) {
+		t.Errorf("expected %d bytes, got %d", len(expectedPng), len(data))
 	}
 }

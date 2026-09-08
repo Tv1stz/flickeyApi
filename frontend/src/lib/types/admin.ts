@@ -46,6 +46,7 @@ export interface VerificationRequestItem {
 	rejection_reason?: string;
 	admin_note?: string;
 	requested_changes?: string[];
+	requisites?: Record<string, any>;
 	documents?: Array<{ id: string; name: string; url: string; status?: string }>;
 	created_at: string;
 	updated_at?: string;

@@ -1,6 +1,5 @@
 // Package amenities provides the static in-memory amenity registry.
-// This is a direct Go port of app/core/amenities.py.
-// All amenity IDs, categories, and Russian display names are identical.
+// Authoritative single source of truth for amenity IDs, categories, and Russian display names.
 package amenities
 
 // HousingType represents the supported property types.
@@ -19,6 +18,20 @@ var AllHousingTypes = map[HousingType]struct{}{
 	HousingTypeManor:     {},
 }
 
+var housesAndManors = map[HousingType]struct{}{
+	HousingTypeHouse: {},
+	HousingTypeManor: {},
+}
+
+var apartmentsAndHouses = map[HousingType]struct{}{
+	HousingTypeApartment: {},
+	HousingTypeHouse:     {},
+}
+
+var apartmentsOnly = map[HousingType]struct{}{
+	HousingTypeApartment: {},
+}
+
 // IsValidHousingType returns true if the given type is valid.
 func IsValidHousingType(t string) bool {
 	_, ok := AllHousingTypes[HousingType(t)]
@@ -31,19 +44,23 @@ type AmenityDefinition struct {
 	Category     string
 	DisplayName  string
 	AllowedTypes map[HousingType]struct{}
+	Aliases      []string
 }
 
 // IsAllowedFor returns true if this amenity is valid for the given housing type.
 func (a AmenityDefinition) IsAllowedFor(t HousingType) bool {
+	if a.AllowedTypes == nil {
+		return true
+	}
 	_, ok := a.AllowedTypes[t]
 	return ok
 }
 
 // AmenityCategory groups amenities for display.
 type AmenityCategory struct {
-	ID        string
-	Name      string
-	Amenities []AmenityItem
+	ID        string        `json:"id"`
+	Name      string        `json:"name"`
+	Amenities []AmenityItem `json:"amenities"`
 }
 
 // AmenityItem is an amenity for API responses.
@@ -54,24 +71,39 @@ type AmenityItem struct {
 
 var all = AllHousingTypes
 
-// Registry is the authoritative in-memory amenity store.
-// Sorted in the same order as the Python implementation.
-var Registry = map[string]AmenityDefinition{
-	// ── Basic ─────────────────────────────────────────────────────────────────
-	"wifi":             {ID: "wifi", Category: "basic", DisplayName: "Wi-Fi", AllowedTypes: all},
-	"heating":          {ID: "heating", Category: "basic", DisplayName: "Отопление", AllowedTypes: all},
-	"air_conditioning": {ID: "air_conditioning", Category: "basic", DisplayName: "Кондиционер", AllowedTypes: all},
-	"hot_water":        {ID: "hot_water", Category: "basic", DisplayName: "Горячая вода", AllowedTypes: all},
-	"washing_machine":  {ID: "washing_machine", Category: "basic", DisplayName: "Стиральная машина", AllowedTypes: all},
-	"dryer":            {ID: "dryer", Category: "basic", DisplayName: "Сушильная машина", AllowedTypes: all},
-	"tv":               {ID: "tv", Category: "basic", DisplayName: "Телевизор", AllowedTypes: all},
-	"iron":             {ID: "iron", Category: "basic", DisplayName: "Утюг", AllowedTypes: all},
-	"hair_dryer":       {ID: "hair_dryer", Category: "basic", DisplayName: "Фен", AllowedTypes: all},
-	"towels":           {ID: "towels", Category: "basic", DisplayName: "Полотенца", AllowedTypes: all},
-	"bed_linen":        {ID: "bed_linen", Category: "basic", DisplayName: "Постельное белье", AllowedTypes: all},
-	// ── Kitchen ───────────────────────────────────────────────────────────────
-	"full_kitchen":   {ID: "full_kitchen", Category: "kitchen", DisplayName: "Полноценная кухня", AllowedTypes: all},
-	"refrigerator":   {ID: "refrigerator", Category: "kitchen", DisplayName: "Холодильник", AllowedTypes: all},
+// categoriesOrdered defines the display order for categories.
+var categoriesOrdered = []struct{ ID, Name string }{
+	{"essentials", "Основное"},
+	{"kitchen", "Кухня"},
+	{"bedroom_bathroom", "Спальня и ванная"},
+	{"work", "Работа"},
+	{"comfort", "Комфорт и досуг"},
+	{"family", "Для семьи"},
+	{"safety", "Безопасность"},
+	{"access", "Доступ и парковка"},
+	{"outdoor", "На улице"},
+	{"accessibility", "Доступность"},
+	{"services", "Услуги"},
+}
+
+// canonicalRegistry contains all primary amenity definitions.
+var canonicalRegistry = map[string]AmenityDefinition{
+	// ── 1. Essentials ────────────────────────────────────────────────────────
+	"wifi":       {ID: "wifi", Category: "essentials", DisplayName: "Wi‑Fi", AllowedTypes: all},
+	"heating":    {ID: "heating", Category: "essentials", DisplayName: "Отопление", AllowedTypes: all},
+	"ac":         {ID: "ac", Category: "essentials", DisplayName: "Кондиционер", AllowedTypes: all, Aliases: []string{"air_conditioning"}},
+	"hot_water":  {ID: "hot_water", Category: "essentials", DisplayName: "Горячая вода", AllowedTypes: all},
+	"washer":     {ID: "washer", Category: "essentials", DisplayName: "Стиральная машина", AllowedTypes: all, Aliases: []string{"washing_machine"}},
+	"dryer":      {ID: "dryer", Category: "essentials", DisplayName: "Сушильная машина", AllowedTypes: all},
+	"tv":         {ID: "tv", Category: "essentials", DisplayName: "Телевизор", AllowedTypes: all},
+	"iron":       {ID: "iron", Category: "essentials", DisplayName: "Утюг", AllowedTypes: all},
+	"hair_dryer": {ID: "hair_dryer", Category: "essentials", DisplayName: "Фен", AllowedTypes: all},
+	"towels":     {ID: "towels", Category: "essentials", DisplayName: "Полотенца", AllowedTypes: all},
+	"bed_linen":  {ID: "bed_linen", Category: "essentials", DisplayName: "Постельное бельё", AllowedTypes: all},
+
+	// ── 2. Kitchen ───────────────────────────────────────────────────────────
+	"kitchen":        {ID: "kitchen", Category: "kitchen", DisplayName: "Полноценная кухня", AllowedTypes: all, Aliases: []string{"full_kitchen"}},
+	"fridge":         {ID: "fridge", Category: "kitchen", DisplayName: "Холодильник", AllowedTypes: all, Aliases: []string{"refrigerator"}},
 	"stove":          {ID: "stove", Category: "kitchen", DisplayName: "Плита", AllowedTypes: all},
 	"oven":           {ID: "oven", Category: "kitchen", DisplayName: "Духовка", AllowedTypes: all},
 	"dishwasher":     {ID: "dishwasher", Category: "kitchen", DisplayName: "Посудомоечная машина", AllowedTypes: all},
@@ -80,65 +112,87 @@ var Registry = map[string]AmenityDefinition{
 	"kettle":         {ID: "kettle", Category: "kitchen", DisplayName: "Чайник", AllowedTypes: all},
 	"toaster":        {ID: "toaster", Category: "kitchen", DisplayName: "Тостер", AllowedTypes: all},
 	"dining_area":    {ID: "dining_area", Category: "kitchen", DisplayName: "Обеденная зона", AllowedTypes: all},
-	// ── Bedroom and Bathroom ──────────────────────────────────────────────────
-	"extra_pillows_blankets": {ID: "extra_pillows_blankets", Category: "bedroom_and_bathroom", DisplayName: "Дополнительные подушки и одеяла", AllowedTypes: all},
-	"blackout_curtains":      {ID: "blackout_curtains", Category: "bedroom_and_bathroom", DisplayName: "Плотные шторы", AllowedTypes: all},
-	"bathtub":                {ID: "bathtub", Category: "bedroom_and_bathroom", DisplayName: "Ванна", AllowedTypes: all},
-	"shower":                 {ID: "shower", Category: "bedroom_and_bathroom", DisplayName: "Душ", AllowedTypes: all},
-	"bidet":                  {ID: "bidet", Category: "bedroom_and_bathroom", DisplayName: "Биде", AllowedTypes: all},
-	// ── Work ──────────────────────────────────────────────────────────────────
-	"workspace":        {ID: "workspace", Category: "work", DisplayName: "Рабочее место", AllowedTypes: all},
-	"external_monitor": {ID: "external_monitor", Category: "work", DisplayName: "Внешний монитор", AllowedTypes: all},
-	// ── Comfort and Leisure ───────────────────────────────────────────────────
-	"balcony_terrace": {ID: "balcony_terrace", Category: "comfort_and_leisure", DisplayName: "Балкон / терраса", AllowedTypes: all},
-	"gym":             {ID: "gym", Category: "comfort_and_leisure", DisplayName: "Тренажерный зал", AllowedTypes: all},
-	"great_view":      {ID: "great_view", Category: "comfort_and_leisure", DisplayName: "Красивый вид", AllowedTypes: all},
-	"sofa_lounge":     {ID: "sofa_lounge", Category: "comfort_and_leisure", DisplayName: "Диван / зона отдыха", AllowedTypes: all},
-	"board_games":     {ID: "board_games", Category: "comfort_and_leisure", DisplayName: "Настольные игры", AllowedTypes: all},
-	"books":           {ID: "books", Category: "comfort_and_leisure", DisplayName: "Книги", AllowedTypes: all},
-	// ── Family ────────────────────────────────────────────────────────────────
-	"baby_crib":    {ID: "baby_crib", Category: "family", DisplayName: "Детская кроватка", AllowedTypes: all},
-	"high_chair":   {ID: "high_chair", Category: "family", DisplayName: "Стульчик для кормления", AllowedTypes: all},
-	"pets_allowed": {ID: "pets_allowed", Category: "family", DisplayName: "Можно с питомцами", AllowedTypes: all},
-	"toys":         {ID: "toys", Category: "family", DisplayName: "Игрушки", AllowedTypes: all},
-	"baby_bath":    {ID: "baby_bath", Category: "family", DisplayName: "Детская ванночка", AllowedTypes: all},
-	// ── Safety ────────────────────────────────────────────────────────────────
-	"smoke_detector":           {ID: "smoke_detector", Category: "safety", DisplayName: "Датчик дыма", AllowedTypes: all},
-	"carbon_monoxide_detector": {ID: "carbon_monoxide_detector", Category: "safety", DisplayName: "Датчик угарного газа", AllowedTypes: all},
-	"fire_extinguisher":        {ID: "fire_extinguisher", Category: "safety", DisplayName: "Огнетушитель", AllowedTypes: all},
-	"first_aid_kit":            {ID: "first_aid_kit", Category: "safety", DisplayName: "Аптечка", AllowedTypes: all},
-	"safe":                     {ID: "safe", Category: "safety", DisplayName: "Сейф", AllowedTypes: all},
-	// ── Access and Parking ────────────────────────────────────────────────────
-	"self_check_in": {ID: "self_check_in", Category: "access_and_parking", DisplayName: "Бесконтактное заселение", AllowedTypes: all},
-	"elevator":      {ID: "elevator", Category: "access_and_parking", DisplayName: "Лифт", AllowedTypes: all},
-	"parking":       {ID: "parking", Category: "access_and_parking", DisplayName: "Парковка", AllowedTypes: all},
-	"ev_charger":    {ID: "ev_charger", Category: "access_and_parking", DisplayName: "Зарядка для электромобилей", AllowedTypes: all},
-	// ── Accessibility ─────────────────────────────────────────────────────────
-	"wide_entrance":       {ID: "wide_entrance", Category: "accessibility", DisplayName: "Широкий дверной проем", AllowedTypes: all},
-	"step_free_entrance":  {ID: "step_free_entrance", Category: "accessibility", DisplayName: "Вход без ступеней", AllowedTypes: all},
-	"accessible_bathroom": {ID: "accessible_bathroom", Category: "accessibility", DisplayName: "Оборудованная ванная комната", AllowedTypes: all},
+
+	// ── 3. Bedroom & Bathroom ────────────────────────────────────────────────
+	"extra_pillows":     {ID: "extra_pillows", Category: "bedroom_bathroom", DisplayName: "Дополнительные подушки и одеяла", AllowedTypes: all, Aliases: []string{"extra_pillows_blankets"}},
+	"blackout_curtains": {ID: "blackout_curtains", Category: "bedroom_bathroom", DisplayName: "Блэкаут-шторы", AllowedTypes: all},
+	"bathtub":           {ID: "bathtub", Category: "bedroom_bathroom", DisplayName: "Ванна", AllowedTypes: all},
+	"shower":            {ID: "shower", Category: "bedroom_bathroom", DisplayName: "Душ", AllowedTypes: all},
+	"bidet":             {ID: "bidet", Category: "bedroom_bathroom", DisplayName: "Биде", AllowedTypes: all},
+
+	// ── 4. Work ──────────────────────────────────────────────────────────────
+	"workspace": {ID: "workspace", Category: "work", DisplayName: "Рабочее место", AllowedTypes: all},
+	"monitor":   {ID: "monitor", Category: "work", DisplayName: "Внешний монитор", AllowedTypes: all, Aliases: []string{"external_monitor"}},
+
+	// ── 5. Comfort & Leisure ─────────────────────────────────────────────────
+	"balcony":   {ID: "balcony", Category: "comfort", DisplayName: "Балкон / терраса", AllowedTypes: apartmentsAndHouses, Aliases: []string{"balcony_terrace"}},
+	"garden":    {ID: "garden", Category: "comfort", DisplayName: "Сад / двор", AllowedTypes: housesAndManors},
+	"pool":      {ID: "pool", Category: "comfort", DisplayName: "Бассейн", AllowedTypes: housesAndManors},
+	"hot_tub":   {ID: "hot_tub", Category: "comfort", DisplayName: "Джакузи / горячая ванна", AllowedTypes: housesAndManors},
+	"gym":       {ID: "gym", Category: "comfort", DisplayName: "Спортзал", AllowedTypes: all},
+	"sauna":     {ID: "sauna", Category: "comfort", DisplayName: "Сауна", AllowedTypes: housesAndManors},
+	"fireplace": {ID: "fireplace", Category: "comfort", DisplayName: "Камин", AllowedTypes: housesAndManors},
+	"view":      {ID: "view", Category: "comfort", DisplayName: "Красивый вид", AllowedTypes: all, Aliases: []string{"great_view"}},
+	"sofa":      {ID: "sofa", Category: "comfort", DisplayName: "Диван / зона отдыха", AllowedTypes: all, Aliases: []string{"sofa_lounge"}},
+	"games":     {ID: "games", Category: "comfort", DisplayName: "Настольные игры", AllowedTypes: all, Aliases: []string{"board_games"}},
+	"books":     {ID: "books", Category: "comfort", DisplayName: "Книги", AllowedTypes: all},
+
+	// ── 6. Family ────────────────────────────────────────────────────────────
+	"crib":          {ID: "crib", Category: "family", DisplayName: "Детская кроватка", AllowedTypes: all, Aliases: []string{"baby_crib"}},
+	"high_chair":    {ID: "high_chair", Category: "family", DisplayName: "Детский стульчик", AllowedTypes: all},
+	"pets_allowed":  {ID: "pets_allowed", Category: "family", DisplayName: "Можно с животными", AllowedTypes: all},
+	"children_toys": {ID: "children_toys", Category: "family", DisplayName: "Игрушки", AllowedTypes: all, Aliases: []string{"toys"}},
+	"baby_bath":     {ID: "baby_bath", Category: "family", DisplayName: "Детская ванночка", AllowedTypes: all},
+
+	// ── 7. Safety ────────────────────────────────────────────────────────────
+	"smoke_alarm":       {ID: "smoke_alarm", Category: "safety", DisplayName: "Датчик дыма", AllowedTypes: all, Aliases: []string{"smoke_detector"}},
+	"co_alarm":          {ID: "co_alarm", Category: "safety", DisplayName: "Датчик угарного газа", AllowedTypes: all, Aliases: []string{"carbon_monoxide_detector"}},
+	"fire_extinguisher": {ID: "fire_extinguisher", Category: "safety", DisplayName: "Огнетушитель", AllowedTypes: all},
+	"first_aid":         {ID: "first_aid", Category: "safety", DisplayName: "Аптечка", AllowedTypes: all, Aliases: []string{"first_aid_kit"}},
+	"lockbox":           {ID: "lockbox", Category: "safety", DisplayName: "Кодовый замок / сейф", AllowedTypes: all, Aliases: []string{"safe"}},
+
+	// ── 8. Access & Parking ──────────────────────────────────────────────────
+	"self_checkin": {ID: "self_checkin", Category: "access", DisplayName: "Самостоятельный заезд", AllowedTypes: all, Aliases: []string{"self_check_in"}},
+	"elevator":     {ID: "elevator", Category: "access", DisplayName: "Лифт", AllowedTypes: apartmentsOnly},
+	"parking":      {ID: "parking", Category: "access", DisplayName: "Парковка", AllowedTypes: all},
+	"ev_charger":   {ID: "ev_charger", Category: "access", DisplayName: "Зарядка для электромобиля", AllowedTypes: all},
+
+	// ── 9. Outdoor ───────────────────────────────────────────────────────────
+	"bbq":             {ID: "bbq", Category: "outdoor", DisplayName: "Мангал / барбекю", AllowedTypes: housesAndManors},
+	"outdoor_seating": {ID: "outdoor_seating", Category: "outdoor", DisplayName: "Зона отдыха на улице", AllowedTypes: housesAndManors},
+	"outdoor_shower":  {ID: "outdoor_shower", Category: "outdoor", DisplayName: "Уличный душ", AllowedTypes: housesAndManors},
+	"sun_loungers":    {ID: "sun_loungers", Category: "outdoor", DisplayName: "Шезлонги", AllowedTypes: housesAndManors},
+
+	// ── 10. Accessibility ────────────────────────────────────────────────────
+	"wide_entrance":       {ID: "wide_entrance", Category: "accessibility", DisplayName: "Широкий вход (для коляски / кресла)", AllowedTypes: all},
+	"step_free":           {ID: "step_free", Category: "accessibility", DisplayName: "Вход без ступенек", AllowedTypes: all, Aliases: []string{"step_free_entrance"}},
+	"accessible_bathroom": {ID: "accessible_bathroom", Category: "accessibility", DisplayName: "Ванная для людей с ОВЗ", AllowedTypes: all},
+	"pool_hoist":          {ID: "pool_hoist", Category: "accessibility", DisplayName: "Подъёмник для бассейна", AllowedTypes: housesAndManors},
+
+	// ── 11. Services ─────────────────────────────────────────────────────────
+	"breakfast":       {ID: "breakfast", Category: "services", DisplayName: "Завтрак включён", AllowedTypes: all},
+	"long_term_stays": {ID: "long_term_stays", Category: "services", DisplayName: "Длительное проживание (от месяца)", AllowedTypes: all},
 }
 
-// categoriesOrdered preserves the original Python category order.
-var categoriesOrdered = []struct{ ID, Name string }{
-	{"basic", "Основное"},
-	{"kitchen", "Кухня"},
-	{"bedroom_and_bathroom", "Спальня и ванная"},
-	{"work", "Работа"},
-	{"comfort_and_leisure", "Комфорт и отдых"},
-	{"family", "Для семей"},
-	{"safety", "Безопасность"},
-	{"access_and_parking", "Доступ и парковка"},
-	{"accessibility", "Доступность"},
-}
+// Registry is the full lookup map including canonical IDs and alias mappings.
+var Registry = func() map[string]AmenityDefinition {
+	m := make(map[string]AmenityDefinition, len(canonicalRegistry)*2)
+	for id, def := range canonicalRegistry {
+		m[id] = def
+		for _, alias := range def.Aliases {
+			m[alias] = def
+		}
+	}
+	return m
+}()
 
-// GetAmenity looks up an amenity by ID.
+// GetAmenity looks up an amenity by canonical ID or alias.
 func GetAmenity(id string) (AmenityDefinition, bool) {
 	a, ok := Registry[id]
 	return a, ok
 }
 
-// GetGroupedAmenities returns amenities grouped by category, optionally filtered by housing type.
+// GetGroupedAmenities returns canonical amenities grouped by category, optionally filtered by housing type.
 func GetGroupedAmenities(housingType string) []AmenityCategory {
 	var filterType *HousingType
 	if housingType != "" {
@@ -149,7 +203,7 @@ func GetGroupedAmenities(housingType string) []AmenityCategory {
 	var result []AmenityCategory
 	for _, cat := range categoriesOrdered {
 		var items []AmenityItem
-		for _, a := range Registry {
+		for _, a := range canonicalRegistry {
 			if a.Category != cat.ID {
 				continue
 			}

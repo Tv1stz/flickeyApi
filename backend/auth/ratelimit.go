@@ -111,6 +111,9 @@ func CheckIPRateLimit(ctx context.Context, rdb *redis.Client, cfg *config.Settin
 // CheckResendCooldown enforces a per-phone resend cooldown (60 seconds, NX lock).
 // Returns error if the phone is still within the cooldown window.
 func CheckResendCooldown(ctx context.Context, rdb *redis.Client, cfg *config.Settings, phone string) error {
+	if cfg.OTPResendCooldownSeconds <= 0 {
+		return nil
+	}
 	key := OTPResendCooldownPrefix + HashPhoneForKey(phone)
 	ttl := time.Duration(cfg.OTPResendCooldownSeconds) * time.Second
 
@@ -122,12 +125,15 @@ func CheckResendCooldown(ctx context.Context, rdb *redis.Client, cfg *config.Set
 	if !set {
 		// Already set — get remaining TTL.
 		remaining, err := rdb.TTL(ctx, key).Result()
-		if err != nil {
-			remaining = ttl
+		if err != nil || remaining <= 0 {
+			// Stale key without TTL or expired — clear it and set fresh TTL
+			_ = rdb.Del(ctx, key).Err()
+			_ = rdb.Set(ctx, key, "1", ttl).Err()
+			return nil
 		}
 		return &RateLimitError{
 			Code:              "RESEND_COOLDOWN",
-			Message:           fmt.Sprintf("Please wait %d seconds before requesting another OTP.", int(remaining.Seconds())),
+			Message:           fmt.Sprintf("Пожалуйста, подождите %d сек. перед повторной отправкой кода.", int(remaining.Seconds())),
 			RetryAfterSeconds: int64(remaining.Seconds()),
 		}
 	}

@@ -60,6 +60,37 @@ func RequireAuth(cfg *config.Settings, database *gorm.DB) gin.HandlerFunc {
 	}
 }
 
+// OptionalAuth parses the Bearer token if present and populates the user in context.
+// Requests without token or with invalid tokens proceed without error.
+func OptionalAuth(cfg *config.Settings, database *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		tokenStr := extractBearerToken(c)
+		if tokenStr == "" {
+			c.Next()
+			return
+		}
+
+		claims, err := DecodeAccessToken(cfg, tokenStr)
+		if err != nil {
+			c.Next()
+			return
+		}
+
+		userID, err := uuid.Parse(claims.Subject)
+		if err != nil {
+			c.Next()
+			return
+		}
+
+		user, err := db.FindUserByIDCtx(c.Request.Context(), database, userID)
+		if err == nil && user != nil && user.Status != db.UserStatusSuspended && user.Status != db.UserStatusBanned {
+			c.Set(ctxUserKey, user)
+			c.Set(ctxUserIDKey, userID)
+		}
+		c.Next()
+	}
+}
+
 // RequireActiveUser rejects users with pending_profile status.
 // Must be chained after RequireAuth.
 func RequireActiveUser() gin.HandlerFunc {
