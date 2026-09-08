@@ -6,7 +6,9 @@ export type ListingStatus =
 	| 'pending_review'
 	| 'awaiting_company_verification'
 	| 'published'
+	| 'changes_requested'
 	| 'rejected'
+	| 'suspended'
 	| 'archived';
 
 export interface ListingRules {
@@ -64,6 +66,8 @@ export interface ListingPublic {
 	amenities: string[];
 	media: string[];
 	created_at: string;
+	rejection_reason?: string;
+	moderation_comment?: string;
 }
 
 export interface ListingHost extends ListingPublic {
@@ -72,6 +76,8 @@ export interface ListingHost extends ListingPublic {
 	verification_video_url?: string;
 	verification_video_id?: string;
 	updated_at: string;
+	rejection_reason?: string;
+	moderation_comment?: string;
 }
 
 export interface CreateDraftRequest {

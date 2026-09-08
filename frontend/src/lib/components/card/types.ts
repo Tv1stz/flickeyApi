@@ -117,6 +117,8 @@ export interface Listing {
 	status?: string;
 	verificationVideoUrl?: string;
 	verificationVideoId?: string;
+	rejectionReason?: string;
+	moderationComment?: string;
 }
 
 // ═══════════════════════════════════════════════════════════════

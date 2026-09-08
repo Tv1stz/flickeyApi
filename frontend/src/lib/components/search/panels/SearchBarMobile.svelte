@@ -12,6 +12,7 @@
 	import { Search, X, MapPin, Minus, Plus } from 'lucide-svelte';
 	import Modal from '$lib/components/ui/Modal.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
+	import { saveRecentSearch } from '$lib/services/localStorage';
 
 	interface Props {
 		open: boolean;
@@ -38,8 +39,8 @@
 			pt = searchStore.params.propertyType;
 			adults = searchStore.params.adults;
 			children = searchStore.params.children;
-			checkin = searchStore.params.checkin;
-			checkout = searchStore.params.checkout;
+			checkin = searchStore.params.checkin ?? null;
+			checkout = searchStore.params.checkout ?? null;
 			localFilters = { ...searchStore.filters };
 		}
 	});
@@ -76,6 +77,7 @@
 		searchStore.setDraft({ location: loc, propertyType: pt, adults, children, checkin, checkout });
 		searchStore.setDraftFilters(localFilters);
 		searchStore.commit();
+		saveRecentSearch(searchStore.params, searchStore.filters);
 		onClose();
 		onApply?.();
 	}

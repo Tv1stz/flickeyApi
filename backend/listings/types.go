@@ -191,6 +191,8 @@ type ListingHostReadSchema struct {
 	Media                []string   `json:"media"`
 	VerificationVideoURL *string    `json:"verification_video_url,omitempty"`
 	VerificationVideoID  *uuid.UUID `json:"verification_video_id,omitempty"`
+	RejectionReason      *string    `json:"rejection_reason,omitempty"`
+	ModerationComment    *string    `json:"moderation_comment,omitempty"`
 	CreatedAt            time.Time  `json:"created_at"`
 	UpdatedAt            time.Time  `json:"updated_at"`
 }
@@ -198,6 +200,48 @@ type ListingHostReadSchema struct {
 // AttachVerificationVideoRequest is the payload for POST /listings/:id/verification-video.
 type AttachVerificationVideoRequest struct {
 	MediaID uuid.UUID `json:"media_id" binding:"required"`
+}
+
+// UpdateListingRequest is the payload for PATCH /listings/:listing_id.
+type UpdateListingRequest struct {
+	Title           *string   `json:"title"`
+	Name            *string   `json:"name"`
+	Description     *string   `json:"description"`
+	PropertyType    *string   `json:"property_type"`
+	Type            *string   `json:"type"`
+	Address         *string   `json:"address"`
+	City            *string   `json:"city"`
+	Street          *string   `json:"street"`
+	HouseNumber     *string   `json:"house_number"`
+	Latitude        *float64  `json:"latitude"`
+	Longitude       *float64  `json:"longitude"`
+	Area            *float64  `json:"area"`
+	Square          *float64  `json:"square"`
+	Floor           *int      `json:"floor"`
+	TotalFloors     *int      `json:"total_floors"`
+	MaxGuests       *int      `json:"max_guests"`
+	Bedrooms        *int      `json:"bedrooms"`
+	RoomsCount      *int      `json:"rooms_count"`
+	Beds            *int      `json:"beds"`
+	BedsCount       *int      `json:"beds_count"`
+	Bathrooms       *int      `json:"bathrooms"`
+	BathroomsCount  *int      `json:"bathrooms_count"`
+	PricePerNight   *float64  `json:"price_per_night"`
+	Currency        *string   `json:"currency"`
+	MinNights       *int      `json:"min_nights"`
+	CheckinFrom     *string   `json:"checkin_from"`
+	CheckoutUntil   *string   `json:"checkout_until"`
+	AllowChildren   *bool     `json:"allow_children"`
+	AllowPets       *bool     `json:"allow_pets"`
+	AllowSmoking    *bool     `json:"allow_smoking"`
+	AllowParties    *bool     `json:"allow_parties"`
+	DepositRequired     *bool     `json:"deposit_required"`
+	Amenities           *[]string `json:"amenities"`
+	Images              *[]string `json:"images"`
+	MediaIDs            *[]string `json:"media_ids"`
+	Status              *string   `json:"status"`
+	SaveAsDraft         *bool     `json:"save_as_draft"`
+	SubmitForModeration *bool     `json:"submit_for_moderation"`
 }
 
 type HostSchema struct {

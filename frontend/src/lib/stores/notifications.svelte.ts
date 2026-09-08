@@ -1,6 +1,6 @@
 import { API_BASE } from '$lib/api/client';
 import { notificationsApi } from '$lib/api/notifications';
-import { toast } from '$lib/components/ui/toast.svelte';
+import { toast } from '$lib/stores/toastStore';
 import type { Notification } from '$lib/types/notification';
 
 class NotificationStore {
@@ -134,24 +134,42 @@ class NotificationStore {
 	}
 
 	/**
+	 * Send test notification (development only).
+	 */
+	async sendDevTestNotification(type?: string): Promise<void> {
+		try {
+			const notif = await notificationsApi.sendTestNotification(type);
+			const exists = this.items.some((i) => i.id === notif.id);
+			if (!exists) {
+				this.items = [notif, ...this.items];
+				this.unreadCount += 1;
+				this.total += 1;
+			}
+		} catch (err) {
+			console.error('Failed to send test notification:', err);
+			toast.error('Ошибка', 'Не удалось создать тестовое уведомление');
+		}
+	}
+
+	/**
 	 * Display an in-app toast based on the notification type.
 	 */
 	private triggerToast(notif: Notification): void {
 		switch (notif.type) {
 			case 'listing_approved':
 			case 'verification_approved':
-				toast.success(notif.message, notif.title || 'Одобрено');
+				toast.success(notif.title || 'Одобрено', notif.message);
 				break;
 			case 'listing_rejected':
 			case 'verification_rejected':
-				toast.error(notif.message, notif.title || 'Отклонено');
+				toast.error(notif.title || 'Отклонено', notif.message);
 				break;
 			case 'enforcement_issued':
 			case 'verification_changes_requested':
-				toast.warning(notif.message, notif.title || 'Внимание');
+				toast.warning(notif.title || 'Внимание', notif.message);
 				break;
 			default:
-				toast.info(notif.message, notif.title || 'Уведомление');
+				toast.info(notif.title || 'Уведомление', notif.message);
 				break;
 		}
 	}

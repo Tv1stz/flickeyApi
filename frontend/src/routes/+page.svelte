@@ -4,12 +4,14 @@
 	import ListingGrid from '$lib/components/card/ListingGrid.svelte';
 	import SearchBarMobile from '$lib/components/search/panels/SearchBarMobile.svelte';
 	import SearchPanelMobile from '$lib/components/search/panels/SearchPanelMobile.svelte';
+	import RecentSearchCard from '$lib/components/search/RecentSearchCard.svelte';
 	import { searchStore } from '$lib/stores/searchStore.svelte';
 	import {
 		getCityOptionsFromListings,
 		getPopularCitiesFromListings,
 		buildSearchUrl
 	} from '$lib/components/search/taxonomy';
+	import { getRecentSearches, type RecentSearch } from '$lib/services/localStorage';
 	import { resolve } from '$app/paths';
 	import { goto } from '$app/navigation';
 	import { fade } from 'svelte/transition';
@@ -22,9 +24,12 @@
 	let favorites = $derived(favoritesStore.favoriteIds);
 	let allListings = $derived((data.listings || []).map(apiListingToCardListing));
 	let mobileSearchOpen = $state(false);
+	let lastSearch = $state<RecentSearch | null>(null);
 
 	onMount(() => {
 		searchStore.resetAll();
+		const recent = getRecentSearches();
+		lastSearch = recent.length > 0 ? recent[0] : null;
 		if (allListings.length > 0) {
 			searchStore.setListings(allListings);
 			searchStore.setAvailableCities(getCityOptionsFromListings(allListings));
@@ -47,7 +52,27 @@
 		class="lg:hidden"
 	/>
 
-	<section class="pt-8 pb-8 lg:pt-32 lg:pb-10">
+	<!-- Недавний поиск -->
+	{#if lastSearch}
+		<section class="pt-6 lg:pt-10">
+			<div class="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8">
+				<div class="flex justify-center">
+					<RecentSearchCard
+						search={lastSearch}
+						onClick={() => {
+							if (!lastSearch) return;
+							searchStore.setDraft(lastSearch.params);
+							searchStore.setDraftFilters(lastSearch.filters);
+							searchStore.commit();
+							goto(resolve('/search'));
+						}}
+					/>
+				</div>
+			</div>
+		</section>
+	{/if}
+
+	<section class="pt-8 pb-8 {lastSearch ? 'lg:pt-16' : 'lg:pt-32'} lg:pb-10">
 		<div class="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8">
 			<div class="mx-auto max-w-3xl text-center">
 				<h1

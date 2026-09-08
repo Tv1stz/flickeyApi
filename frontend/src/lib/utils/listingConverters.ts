@@ -471,7 +471,9 @@ export function apiListingToCardListing(apiListing: ListingPublic): Listing {
 		status: apiListing.status,
 		isActive: apiListing.status === 'published' || apiListing.status === 'active' || !apiListing.status,
 		verificationVideoUrl: (apiListing as any).verification_video_url,
-		verificationVideoId: (apiListing as any).verification_video_id
+		verificationVideoId: (apiListing as any).verification_video_id,
+		rejectionReason: (apiListing as any).rejection_reason,
+		moderationComment: (apiListing as any).moderation_comment
 	});
 }
 

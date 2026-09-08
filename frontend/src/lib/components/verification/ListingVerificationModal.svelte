@@ -122,15 +122,7 @@
 			</div>
 
 			<!-- Footer -->
-			<div class="flex items-center justify-between gap-3 px-6 py-4 bg-zinc-50 border-t border-zinc-100 dark:bg-muted/30 dark:border-border">
-				<button
-					type="button"
-					onclick={onClose}
-					class="rounded-full border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 transition active:scale-95 cursor-pointer dark:border-border dark:bg-card dark:text-muted-foreground dark:hover:bg-muted"
-				>
-					Загрузить позже
-				</button>
-
+			<div class="flex items-center justify-end gap-3 px-6 py-4 bg-zinc-50 border-t border-zinc-100 dark:bg-muted/30 dark:border-border">
 				<button
 					type="button"
 					onclick={onClose}

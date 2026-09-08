@@ -1,5 +1,5 @@
 import { apiRequest } from './client';
-import type { NotificationListResponse, UnreadCountResponse } from '$lib/types/notification';
+import type { Notification, NotificationListResponse, UnreadCountResponse } from '$lib/types/notification';
 
 export interface GetNotificationsParams {
 	limit?: number;
@@ -47,6 +47,16 @@ export const notificationsApi = {
 	markAllAsRead(): Promise<{ success: boolean }> {
 		return apiRequest<{ success: boolean }>('/notifications/read-all', {
 			method: 'POST'
+		});
+	},
+
+	/**
+	 * Send test notification (development only).
+	 */
+	sendTestNotification(type?: string): Promise<Notification> {
+		return apiRequest<Notification>('/notifications/test', {
+			method: 'POST',
+			body: JSON.stringify(type ? { type } : {})
 		});
 	}
 };

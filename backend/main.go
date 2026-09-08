@@ -31,6 +31,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -293,7 +294,19 @@ func corsMiddleware(cfg *config.Settings) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
 
-		if allowedOrigins[origin] {
+		isAllowed := allowedOrigins[origin]
+		if !isAllowed && origin != "" {
+			if strings.HasPrefix(origin, "http://localhost:") ||
+				strings.HasPrefix(origin, "http://127.0.0.1:") ||
+				strings.HasPrefix(origin, "https://localhost:") ||
+				strings.HasPrefix(origin, "https://127.0.0.1:") ||
+				origin == "http://localhost" ||
+				origin == "http://127.0.0.1" {
+				isAllowed = true
+			}
+		}
+
+		if isAllowed {
 			c.Header("Access-Control-Allow-Origin", origin)
 			c.Header("Access-Control-Allow-Credentials", "true")
 			c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")

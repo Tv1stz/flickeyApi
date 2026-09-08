@@ -6,12 +6,14 @@
 	import { resolve } from '$app/paths';
 	import { goto } from '$app/navigation';
 	import { Heart, Home, User as UserIcon, BarChart3, LayoutGrid, Plus, Calendar } from 'lucide-svelte';
+	import { notifications } from '$lib/stores/notifications.svelte';
 
 	let currentPath = $derived($page.url.pathname);
 	let authenticated = $derived(auth.isAuthenticated || authStore.isAuthenticated);
 	let hostMode = $derived(authStore.isHostMode);
 	let user = $derived(authStore.user);
 	let initials = $derived(authStore.userInitials);
+	let hasUnreadNotifications = $derived(notifications.hasUnread);
 
 	const isListingDetailPage = $derived(
 		/^\/listings\/[^/]+$/.test(currentPath) && !currentPath.endsWith('/new')
@@ -119,25 +121,30 @@
 							       {active ? 'text-zinc-900' : 'text-zinc-400'}"
 						>
 							{#if isProfile}
-								<div
-									class="flex h-7 w-7 items-center justify-center overflow-hidden
-							               rounded-full transition-all duration-200
-							               {active ? 'ring-[2.5px] ring-zinc-900 ring-offset-1' : ''}"
-								>
-									{#if user?.avatar}
-										<img src={user.avatar} alt="" class="h-full w-full object-cover" />
-									{:else}
-										<div
-											class="flex h-full w-full items-center justify-center
-							                       {active ? 'bg-zinc-900' : 'bg-zinc-200'}"
-										>
-											<span
-												class="text-[10px] font-bold
-							                           {active ? 'text-white' : 'text-zinc-500'}"
+								<div class="relative">
+									<div
+										class="flex h-7 w-7 items-center justify-center overflow-hidden
+								               rounded-full transition-all duration-200
+								               {active ? 'ring-[2.5px] ring-zinc-900 ring-offset-1' : ''}"
+									>
+										{#if user?.avatar}
+											<img src={user.avatar} alt="" class="h-full w-full object-cover" />
+										{:else}
+											<div
+												class="flex h-full w-full items-center justify-center
+								                       {active ? 'bg-zinc-900' : 'bg-zinc-200'}"
 											>
-												{initials}
-											</span>
-										</div>
+												<span
+													class="text-[10px] font-bold
+								                           {active ? 'text-white' : 'text-zinc-500'}"
+												>
+													{initials}
+												</span>
+											</div>
+										{/if}
+									</div>
+									{#if hasUnreadNotifications}
+										<span class="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-white"></span>
 									{/if}
 								</div>
 								<span class="text-[10px] leading-none font-medium">{tab.label}</span>

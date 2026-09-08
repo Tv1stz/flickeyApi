@@ -47,6 +47,10 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup, authMw gin.HandlerFunc, ac
 		protected.GET("/unread-count", h.GetUnreadCount)
 		protected.PATCH("/:id/read", h.MarkAsRead)
 		protected.POST("/read-all", h.MarkAllAsRead)
+
+		if h.Cfg != nil && h.Cfg.IsDev() {
+			protected.POST("/test", h.CreateTestNotification)
+		}
 	}
 }
 
@@ -296,4 +300,80 @@ func (h *Handler) MarkAllAsRead(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, SuccessResponse{Success: true})
+}
+
+// TestNotificationRequest is the optional request payload for POST /notifications/test.
+type TestNotificationRequest struct {
+	Type    string         `json:"type"`
+	Title   string         `json:"title"`
+	Message string         `json:"message"`
+	Payload map[string]any `json:"payload"`
+}
+
+// CreateTestNotification creates and broadcasts a test notification for the authenticated user.
+func (h *Handler) CreateTestNotification(c *gin.Context) {
+	if h.Cfg == nil || !h.Cfg.IsDev() {
+		c.JSON(http.StatusForbidden, gin.H{"code": "FORBIDDEN", "message": "Only available in development mode"})
+		return
+	}
+
+	userID := auth.GetCurrentUserID(c)
+	if userID == uuid.Nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"code": "UNAUTHORIZED", "message": "Authentication required"})
+		return
+	}
+
+	var req TestNotificationRequest
+	_ = c.ShouldBindJSON(&req)
+
+	nType := req.Type
+	if nType == "" {
+		nType = TypeListingApproved
+	}
+
+	title := req.Title
+	if title == "" {
+		switch nType {
+		case TypeListingApproved:
+			title = "Объявление одобрено"
+		case TypeListingRejected:
+			title = "Объявление отклонено"
+		case TypeBookingCreated:
+			title = "Новое бронирование"
+		case TypeEnforcementIssued:
+			title = "Предупреждение модерации"
+		default:
+			title = "Тестовое уведомление"
+		}
+	}
+
+	msg := req.Message
+	if msg == "" {
+		switch nType {
+		case TypeListingApproved:
+			msg = "Ваше объявление «Уютные апартаменты в центре» успешно прошло модерацию и опубликовано."
+		case TypeListingRejected:
+			msg = "Пожалуйста, обновите фотографии в объявлении согласно правилам сервиса."
+		case TypeBookingCreated:
+			msg = "Гость Александр оформил бронирование с 15 по 18 сентября."
+		default:
+			msg = "Это проверка доставки уведомлений в реальном времени через SSE."
+		}
+	}
+
+	payload := req.Payload
+	if payload == nil {
+		payload = map[string]any{
+			"timestamp": time.Now().UTC().Format(time.RFC3339),
+			"is_test":   true,
+		}
+	}
+
+	created, err := h.Service.CreateNotification(c.Request.Context(), userID, nType, title, msg, payload)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": "INTERNAL_ERROR", "message": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, FromModel(created))
 }

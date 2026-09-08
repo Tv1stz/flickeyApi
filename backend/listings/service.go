@@ -18,6 +18,7 @@ import (
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // ListingService orchestrates draft lifecycle and final submission.
@@ -615,10 +616,14 @@ func (s *ListingService) SubmitDraft(ctx context.Context, draftID, hostID uuid.U
 				return fmt.Errorf("save draft pending review: %w", err)
 			}
 
-			// If source listing is rejected or awaiting verification, keep its status aligned
-			if sourceListing.Status == "rejected" || sourceListing.Status == "archived" {
-				_ = tx.Model(sourceListing).Update("status", "awaiting_company_verification").Error
-				sourceListing.Status = "awaiting_company_verification"
+			// If source listing was rejected, archived, or had changes requested, align its status to pending_review
+			if sourceListing.Status == "rejected" || sourceListing.Status == "archived" || sourceListing.Status == "changes_requested" {
+				_ = tx.Model(sourceListing).Updates(map[string]any{
+					"status":             "pending_review",
+					"rejection_reason":   nil,
+					"moderation_comment": nil,
+				}).Error
+				sourceListing.Status = "pending_review"
 			}
 
 			resp = ListingSubmitResponse{
@@ -758,7 +763,7 @@ func (s *ListingService) SubmitDraft(ctx context.Context, draftID, hostID uuid.U
 	return &resp, nil
 }
 
-// ArchiveListing archives a listing owned by hostID.
+// ArchiveListing archives an active published listing owned by hostID.
 func (s *ListingService) ArchiveListing(ctx context.Context, listingID, hostID uuid.UUID) (*db.Listing, error) {
 	listing, err := db.FindListingByIDAndHost(ctx, s.DB, listingID, hostID)
 	if err != nil {
@@ -770,11 +775,17 @@ func (s *ListingService) ArchiveListing(ctx context.Context, listingID, hostID u
 	if listing.Status == "archived" {
 		return listing, nil
 	}
+	if listing.Status != "published" && listing.Status != "active" {
+		return nil, &ValidationError{
+			Code:    "CANNOT_ARCHIVE_UNPUBLISHED",
+			Message: "Only published listings can be moved to archive.",
+		}
+	}
 
 	return db.ArchiveListingByIDAndHost(ctx, s.DB, listingID, hostID)
 }
 
-// UnarchiveListing restores an archived listing owned by hostID.
+// UnarchiveListing restores an archived listing or submits a draft for moderation.
 func (s *ListingService) UnarchiveListing(ctx context.Context, listingID, hostID uuid.UUID) (*db.Listing, error) {
 	listing, err := db.FindListingByIDAndHost(ctx, s.DB, listingID, hostID)
 	if err != nil {
@@ -783,20 +794,32 @@ func (s *ListingService) UnarchiveListing(ctx context.Context, listingID, hostID
 	if listing == nil {
 		return nil, &ListingNotFoundError{}
 	}
-	if listing.Status != "archived" {
-		return listing, nil
-	}
-
-	// Check if there is an active submitted draft with pending changes under moderation
-	pendingDraft, err := db.FindPendingDraftBySourceListingID(ctx, s.DB, listingID)
-	if err != nil {
-		return nil, err
+	if listing.Status != "archived" && listing.Status != "draft" {
+		return nil, &ValidationError{
+			Code:    "INVALID_STATUS_FOR_RESTORE",
+			Message: "Only archived listings or drafts can be restored.",
+		}
 	}
 
 	targetStatus := "published"
-	if pendingDraft != nil {
-		// If there is a submitted draft pending moderation, unarchiving routes through moderation
-		targetStatus = "awaiting_company_verification"
+	if listing.Status == "draft" {
+		// A draft MUST go through moderation. It can NEVER bypass moderation directly to published.
+		targetStatus = "pending_review"
+	} else {
+		// If listing was previously rejected or changes were requested, it must go to moderation
+		if listing.RejectionReason != nil || listing.ModerationComment != nil {
+			targetStatus = "pending_review"
+		} else {
+			// Check if there is an active submitted draft with pending changes under moderation
+			pendingDraft, err := db.FindPendingDraftBySourceListingID(ctx, s.DB, listingID)
+			if err != nil {
+				return nil, err
+			}
+			if pendingDraft != nil {
+				// If there is a submitted draft pending moderation, unarchiving routes through moderation
+				targetStatus = "awaiting_company_verification"
+			}
+		}
 	}
 
 	return db.UnarchiveListingByIDAndHost(ctx, s.DB, listingID, hostID, targetStatus)
@@ -1063,6 +1086,199 @@ func (s *ListingService) AttachVerificationVideo(ctx context.Context, listingID,
 	}
 
 	return updatedListing, nil
+}
+
+// UpdateListing updates an existing listing owned by hostID.
+func (s *ListingService) UpdateListing(ctx context.Context, listingID, hostID uuid.UUID, req *UpdateListingRequest) (*db.Listing, error) {
+	listing, err := db.FindListingByIDAndHost(ctx, s.DB, listingID, hostID)
+	if err != nil {
+		return nil, fmt.Errorf("FindListingByIDAndHost: %w", err)
+	}
+	if listing == nil {
+		return nil, &ListingNotFoundError{}
+	}
+
+	var updatedListing *db.Listing
+
+	txErr := s.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Update scalar fields if provided
+		if req.Title != nil && strings.TrimSpace(*req.Title) != "" {
+			listing.Name = strings.TrimSpace(*req.Title)
+		} else if req.Name != nil && strings.TrimSpace(*req.Name) != "" {
+			listing.Name = strings.TrimSpace(*req.Name)
+		}
+
+		if req.Description != nil {
+			listing.Description = strings.TrimSpace(*req.Description)
+		}
+
+		if req.PropertyType != nil && strings.TrimSpace(*req.PropertyType) != "" {
+			listing.Type = strings.TrimSpace(*req.PropertyType)
+		} else if req.Type != nil && strings.TrimSpace(*req.Type) != "" {
+			listing.Type = strings.TrimSpace(*req.Type)
+		}
+
+		if req.Address != nil {
+			listing.Address = strings.TrimSpace(*req.Address)
+		}
+		if req.City != nil {
+			listing.City = strings.TrimSpace(*req.City)
+		}
+		if req.Street != nil {
+			listing.Street = strings.TrimSpace(*req.Street)
+		}
+		if req.HouseNumber != nil {
+			listing.HouseNumber = strings.TrimSpace(*req.HouseNumber)
+		}
+		if req.Latitude != nil {
+			listing.Latitude = *req.Latitude
+		}
+		if req.Longitude != nil {
+			listing.Longitude = *req.Longitude
+		}
+
+		if req.Area != nil && *req.Area > 0 {
+			listing.Square = *req.Area
+		} else if req.Square != nil && *req.Square > 0 {
+			listing.Square = *req.Square
+		}
+
+		if req.Floor != nil {
+			listing.Floor = *req.Floor
+		}
+		if req.TotalFloors != nil && *req.TotalFloors > 0 {
+			listing.TotalFloors = *req.TotalFloors
+		}
+		if req.MaxGuests != nil && *req.MaxGuests > 0 {
+			listing.MaxGuests = *req.MaxGuests
+		}
+		if req.Bedrooms != nil {
+			listing.RoomsCount = *req.Bedrooms
+		} else if req.RoomsCount != nil {
+			listing.RoomsCount = *req.RoomsCount
+		}
+		if req.Beds != nil {
+			listing.BedsCount = *req.Beds
+		} else if req.BedsCount != nil {
+			listing.BedsCount = *req.BedsCount
+		}
+		if req.Bathrooms != nil {
+			listing.BathroomsCount = *req.Bathrooms
+		} else if req.BathroomsCount != nil {
+			listing.BathroomsCount = *req.BathroomsCount
+		}
+
+		if req.PricePerNight != nil && *req.PricePerNight > 0 {
+			listing.PricePerNight = *req.PricePerNight
+		}
+		if req.Currency != nil && strings.TrimSpace(*req.Currency) != "" {
+			listing.Currency = strings.TrimSpace(*req.Currency)
+		}
+		if req.MinNights != nil && *req.MinNights > 0 {
+			listing.MinNights = *req.MinNights
+		}
+		if req.CheckinFrom != nil && strings.TrimSpace(*req.CheckinFrom) != "" {
+			listing.CheckinFrom = strings.TrimSpace(*req.CheckinFrom)
+		}
+		if req.CheckoutUntil != nil && strings.TrimSpace(*req.CheckoutUntil) != "" {
+			listing.CheckoutUntil = strings.TrimSpace(*req.CheckoutUntil)
+		}
+
+		if req.AllowChildren != nil {
+			listing.AllowChildren = *req.AllowChildren
+		}
+		if req.AllowPets != nil {
+			listing.AllowPets = *req.AllowPets
+		}
+		if req.AllowSmoking != nil {
+			listing.AllowSmoking = *req.AllowSmoking
+		}
+		if req.AllowParties != nil {
+			listing.AllowParties = *req.AllowParties
+		}
+		if req.DepositRequired != nil {
+			listing.DepositRequired = *req.DepositRequired
+		}
+
+		// Handle status transitions (Draft vs Moderation)
+		if req.SubmitForModeration != nil && *req.SubmitForModeration {
+			listing.Status = "pending_review"
+			listing.RejectionReason = nil
+			listing.ModerationComment = nil
+		} else if req.SaveAsDraft != nil && *req.SaveAsDraft {
+			listing.Status = "draft"
+		} else if req.Status != nil && strings.TrimSpace(*req.Status) == "draft" {
+			listing.Status = "draft"
+		} else if req.Status != nil && strings.TrimSpace(*req.Status) == "pending_review" {
+			listing.Status = "pending_review"
+			listing.RejectionReason = nil
+			listing.ModerationComment = nil
+		} else if listing.Status == "changes_requested" || listing.Status == "rejected" || listing.Status == "published" || listing.Status == "active" || listing.Status == "archived" {
+			listing.Status = "pending_review"
+			listing.RejectionReason = nil
+			listing.ModerationComment = nil
+		}
+
+		// Update Amenities if provided
+		if req.Amenities != nil {
+			if err := tx.Where("listing_id = ?", listing.ID).Delete(&db.ListingAmenity{}).Error; err != nil {
+				return fmt.Errorf("delete old amenities: %w", err)
+			}
+			for _, amenityID := range *req.Amenities {
+				if strings.TrimSpace(amenityID) == "" {
+					continue
+				}
+				la := db.ListingAmenity{
+					ListingID: listing.ID,
+					AmenityID: strings.TrimSpace(amenityID),
+				}
+				if err := tx.Create(&la).Error; err != nil {
+					return fmt.Errorf("create listing amenity: %w", err)
+				}
+			}
+		}
+
+		// Update Media if provided
+		mediaList := req.MediaIDs
+		if mediaList == nil {
+			mediaList = req.Images
+		}
+		if mediaList != nil {
+			for _, mStr := range *mediaList {
+				mUUID, parseErr := uuid.Parse(mStr)
+				if parseErr == nil {
+					_ = tx.Model(&db.Media{}).Where("id = ? AND host_id = ?", mUUID, hostID).Update("listing_id", listing.ID).Error
+				} else {
+					cleanKey := strings.TrimPrefix(mStr, "http://localhost:8000/api/v1/media/dev-upload/")
+					cleanKey = strings.TrimPrefix(cleanKey, "/api/v1/media/dev-upload/")
+					_ = tx.Model(&db.Media{}).Where("(file_key = ? OR file_key LIKE ?) AND host_id = ?", cleanKey, "%"+cleanKey, hostID).Update("listing_id", listing.ID).Error
+				}
+			}
+		}
+
+		// Clear loaded associations from in-memory struct so GORM does not cascade-insert old items
+		listing.ListingAmenities = nil
+		listing.Media = nil
+		listing.VerificationVideo = nil
+		listing.Host = nil
+
+		if err := tx.Omit(clause.Associations).Save(listing).Error; err != nil {
+			return fmt.Errorf("save updated listing: %w", err)
+		}
+
+		updatedListing = listing
+		return nil
+	})
+
+	if txErr != nil {
+		return nil, txErr
+	}
+
+	freshListing, err := db.FindListingByIDAndHost(ctx, s.DB, listingID, hostID)
+	if err != nil || freshListing == nil {
+		return updatedListing, nil
+	}
+	return freshListing, nil
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

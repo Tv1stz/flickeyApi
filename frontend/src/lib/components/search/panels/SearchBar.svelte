@@ -14,6 +14,7 @@
 	} from '../taxonomy';
 	import type { Listing, PropertyType } from '$lib/components/card/types';
 	import { SlidersHorizontal } from 'lucide-svelte';
+	import { saveRecentSearch } from '$lib/services/localStorage';
 
 	// ---------------------------------------------------------------------------
 	// Props
@@ -332,6 +333,7 @@
 		e.stopPropagation();
 		searchStore.commit();
 		searchStore.closeDropdowns(resolvedInstanceId);
+		saveRecentSearch(searchStore.params, searchStore.filters);
 		onSearch?.();
 	}
 
@@ -451,8 +453,8 @@
 				>
 					<div class="w-full">
 						<DatesField
-							checkin={draft.checkin}
-							checkout={draft.checkout}
+							checkin={draft.checkin ?? null}
+							checkout={draft.checkout ?? null}
 							isOpen={activeField === 'dates'}
 							dropdownOffsetLeft={datesDropdownOffset}
 							onSelect={(ci, co) => searchStore.setDraft({ checkin: ci, checkout: co })}

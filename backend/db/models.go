@@ -161,6 +161,9 @@ type Listing struct {
 
 	VerificationVideoID *uuid.UUID `gorm:"type:uuid;index:ix_listings_verification_video_id" json:"verification_video_id,omitempty"`
 
+	RejectionReason   *string `gorm:"type:varchar(255)" json:"rejection_reason,omitempty"`
+	ModerationComment *string `gorm:"type:text" json:"moderation_comment,omitempty"`
+
 	// Relationships
 	Host              *User            `gorm:"foreignKey:HostID" json:"host,omitempty"`
 	ListingAmenities  []ListingAmenity `gorm:"foreignKey:ListingID;constraint:OnDelete:CASCADE" json:"listing_amenities,omitempty"`

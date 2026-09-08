@@ -230,8 +230,8 @@
 		class="pointer-events-none fixed inset-0 z-[301] flex items-end justify-center p-0 sm:items-center sm:p-4"
 	>
 		<section
-			class="pointer-events-auto w-full rounded-t-3xl bg-white p-5 shadow-2xl
-                   sm:max-w-md sm:rounded-3xl sm:p-6"
+			class="pointer-events-auto w-full overflow-hidden rounded-t-3xl bg-white p-5 shadow-2xl
+                   sm:max-w-lg sm:rounded-3xl sm:p-7"
 			in:fly={{ y: 100, duration: 300, easing: backOut }}
 			out:fly={{ y: 100, duration: 200, easing: cubicOut }}
 			role="alertdialog"
@@ -257,13 +257,14 @@
 					{confirmToastData.message}
 				</p>
 			</div>
-			<div class="flex flex-col-reverse gap-2 sm:flex-row sm:gap-3">
+			<div class="flex flex-col-reverse gap-2.5 sm:flex-row sm:gap-3">
 				<Button
 					variant="outline"
 					tone="neutral"
 					size="lg"
 					radius="xl"
 					fullWidth
+					class="flex-1 min-w-0 !whitespace-normal text-center leading-snug py-2.5 h-auto min-h-[44px] px-3.5 text-xs sm:text-sm"
 					onclick={() => confirmToastData?.onCancel()}
 				>
 					{confirmToastData.cancelText}
@@ -274,6 +275,7 @@
 					size="lg"
 					radius="xl"
 					fullWidth
+					class="flex-1 min-w-0 !whitespace-normal text-center leading-snug py-2.5 h-auto min-h-[44px] px-3.5 text-xs sm:text-sm"
 					onclick={() => confirmToastData?.onConfirm()}
 				>
 					{confirmToastData.confirmText}

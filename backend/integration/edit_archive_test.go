@@ -207,3 +207,97 @@ func TestListing_Archive_And_Unarchive(t *testing.T) {
 		t.Fatalf("expected awaiting_company_verification, got %s", unarchListing2.Status)
 	}
 }
+
+func TestListing_ArchiveBypassSecurity(t *testing.T) {
+	app := setupApp(t)
+	_, hostToken, _ := app.Suite.CreateUser(randomPhone(), db.UserRoleHost)
+
+	// 1. Create a listing that starts in pending_review
+	draftID := createDraftSteps1to6(t, app, hostToken)
+	submitW := app.Do("POST", "/api/v1/listings/drafts/"+draftID+"/submit", nil, map[string]string{
+		"Authorization":   "Bearer " + hostToken,
+		"Content-Type":    "application/json",
+		"Idempotency-Key": uuid.New().String(),
+	})
+	if submitW.Code != http.StatusCreated {
+		t.Fatalf("submit failed: %d %s", submitW.Code, submitW.Body.String())
+	}
+	var submitResp listings.ListingSubmitResponse
+	_ = json.Unmarshal(submitW.Body.Bytes(), &submitResp)
+	listingID := submitResp.ListingID
+
+	// Listing is in pending_review. Attempting to archive it MUST fail with 400 CANNOT_ARCHIVE_UNPUBLISHED
+	wArchivePending := app.DoAuth(http.MethodPost, "/api/v1/listings/"+listingID.String()+"/archive", nil, hostToken)
+	if wArchivePending.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 when archiving pending_review listing, got %d: %s", wArchivePending.Code, wArchivePending.Body.String())
+	}
+
+	// 2. Set listing status to draft. Attempting to archive it MUST fail
+	_ = app.Suite.DB.Model(&db.Listing{}).Where("id = ?", listingID).Update("status", "draft")
+	wArchiveDraft := app.DoAuth(http.MethodPost, "/api/v1/listings/"+listingID.String()+"/archive", nil, hostToken)
+	if wArchiveDraft.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 when archiving draft listing, got %d: %s", wArchiveDraft.Code, wArchiveDraft.Body.String())
+	}
+
+	// 3. Unarchiving a draft MUST set its status to pending_review, NOT published!
+	wUnarchiveDraft := app.DoAuth(http.MethodPost, "/api/v1/listings/"+listingID.String()+"/unarchive", nil, hostToken)
+	if wUnarchiveDraft.Code != http.StatusOK {
+		t.Fatalf("expected 200 on unarchiving draft, got %d: %s", wUnarchiveDraft.Code, wUnarchiveDraft.Body.String())
+	}
+	var unarchDraft listings.ListingHostReadSchema
+	_ = json.Unmarshal(wUnarchiveDraft.Body.Bytes(), &unarchDraft)
+	if unarchDraft.Status != "pending_review" {
+		t.Fatalf("unarchived draft MUST have status pending_review, got %s", unarchDraft.Status)
+	}
+
+	// 4. Set listing status to rejected. Archiving it MUST fail
+	_ = app.Suite.DB.Model(&db.Listing{}).Where("id = ?", listingID).Updates(map[string]any{
+		"status":           "rejected",
+		"rejection_reason": "Bad quality photos",
+	})
+	wArchiveRejected := app.DoAuth(http.MethodPost, "/api/v1/listings/"+listingID.String()+"/archive", nil, hostToken)
+	if wArchiveRejected.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 when archiving rejected listing, got %d: %s", wArchiveRejected.Code, wArchiveRejected.Body.String())
+	}
+
+	// 5. Updating a published listing:
+	// Set to published first
+	_ = app.Suite.DB.Model(&db.Listing{}).Where("id = ?", listingID).Updates(map[string]any{
+		"status":           "published",
+		"rejection_reason": nil,
+	})
+
+	// Host saves changes as draft
+	saveDraftBody := listings.UpdateListingRequest{
+		Name:        ptrString("Updated Title in Draft"),
+		SaveAsDraft: ptrBool(true),
+	}
+	wEditDraft := app.DoAuth(http.MethodPatch, "/api/v1/listings/"+listingID.String(), saveDraftBody, hostToken)
+	if wEditDraft.Code != http.StatusOK {
+		t.Fatalf("expected 200 for update listing draft, got %d: %s", wEditDraft.Code, wEditDraft.Body.String())
+	}
+	var editDraftListing listings.ListingHostReadSchema
+	_ = json.Unmarshal(wEditDraft.Body.Bytes(), &editDraftListing)
+	if editDraftListing.Status != "draft" {
+		t.Fatalf("expected draft status after saving as draft, got %s", editDraftListing.Status)
+	}
+
+	// Host submits draft for moderation
+	submitModBody := listings.UpdateListingRequest{
+		Name:                 ptrString("Updated Title for Review"),
+		SubmitForModeration: ptrBool(true),
+	}
+	wEditMod := app.DoAuth(http.MethodPatch, "/api/v1/listings/"+listingID.String(), submitModBody, hostToken)
+	if wEditMod.Code != http.StatusOK {
+		t.Fatalf("expected 200 for submit for moderation, got %d: %s", wEditMod.Code, wEditMod.Body.String())
+	}
+	var editModListing listings.ListingHostReadSchema
+	_ = json.Unmarshal(wEditMod.Body.Bytes(), &editModListing)
+	if editModListing.Status != "pending_review" {
+		t.Fatalf("expected pending_review status after submit for moderation, got %s", editModListing.Status)
+	}
+}
+
+func ptrString(s string) *string { return &s }
+func ptrBool(b bool) *bool       { return &b }
+

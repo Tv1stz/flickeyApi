@@ -40,9 +40,14 @@
 					text: 'text-emerald-700 dark:text-emerald-400'
 				};
 			case 'pending_review':
-			case 'awaiting_company_verification':
 				return {
 					label: activeLabel || 'На модерации',
+					dot: 'bg-amber-500',
+					text: 'text-amber-700 dark:text-amber-400'
+				};
+			case 'changes_requested':
+				return {
+					label: activeLabel || 'Требуются правки',
 					dot: 'bg-amber-500',
 					text: 'text-amber-700 dark:text-amber-400'
 				};
@@ -54,9 +59,15 @@
 				};
 			case 'draft_video_required':
 				return {
-					label: activeLabel || 'Черновик: требуется загрузить видео',
+					label: activeLabel || 'Нужно видео',
 					dot: 'bg-rose-500',
 					text: 'text-rose-700 dark:text-rose-400'
+				};
+			case 'awaiting_company_verification':
+				return {
+					label: activeLabel || 'Ждёт верификации',
+					dot: 'bg-amber-500',
+					text: 'text-amber-700 dark:text-amber-400'
 				};
 			case 'draft':
 				return {
@@ -71,6 +82,11 @@
 					text: 'text-zinc-500 dark:text-zinc-400'
 				};
 			case 'suspended':
+				return {
+					label: activeLabel || 'Приостановлено',
+					dot: 'bg-zinc-500',
+					text: 'text-zinc-600 dark:text-zinc-400'
+				};
 			case 'inactive':
 			default:
 				return {

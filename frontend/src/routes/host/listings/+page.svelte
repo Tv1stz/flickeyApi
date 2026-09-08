@@ -9,6 +9,7 @@
 	import Button from '$lib/components/ui/Button.svelte';
 	import HostListingCard from '$lib/components/listing/HostListingCard.svelte';
 	import ListingVerificationModal from '$lib/components/verification/ListingVerificationModal.svelte';
+	import ListingModerationModal from '$lib/components/listing/ListingModerationModal.svelte';
 	import PageShell from '$lib/components/ui/page/PageShell.svelte';
 	import PageHeader from '$lib/components/ui/page/PageHeader.svelte';
 	import ViewModeToggle from '$lib/components/ui/page/ViewModeToggle.svelte';
@@ -40,6 +41,21 @@
 
 	let verificationModalOpen = $state(false);
 	let selectedListingForVerification = $state<Listing | null>(null);
+
+	let feedbackModalOpen = $state(false);
+	let selectedListingForFeedback = $state<Listing | null>(null);
+
+	function openFeedbackModal(e: MouseEvent, listing: Listing) {
+		e.preventDefault();
+		e.stopPropagation();
+		selectedListingForFeedback = listing;
+		feedbackModalOpen = true;
+	}
+
+	function closeFeedbackModal() {
+		feedbackModalOpen = false;
+		selectedListingForFeedback = null;
+	}
 
 	async function loadHostVerificationStatus() {
 		try {
@@ -117,15 +133,15 @@
 		goto(resolve('/listings/[id]', { id }));
 	}
 
-	async function handleEditListing(e: MouseEvent, listing: Listing) {
-		e.preventDefault();
-		e.stopPropagation();
-		try {
-			const res = await listingsApi.createDraftFromListing(listing.id, 'edit');
-			toast.info('Редактирование объявления', 'Внесите нужные изменения и отправьте');
-			goto(resolve('/host/new') + `?draft_id=${res.draft_id}`);
-		} catch (err: any) {
-			toast.error('Ошибка', err?.message || 'Не удалось открыть редактирование');
+	function handleEditListing(eOrListing?: MouseEvent | Listing, maybeListing?: Listing) {
+		if (eOrListing && 'preventDefault' in eOrListing) {
+			eOrListing.preventDefault();
+			eOrListing.stopPropagation();
+		}
+		const target = (maybeListing || ((eOrListing as Listing)?.id ? eOrListing : selectedListingForFeedback)) as Listing | null;
+		closeFeedbackModal();
+		if (target?.id) {
+			goto(`/host/listings/${target.id}`);
 		}
 	}
 
@@ -153,10 +169,14 @@
 		e.preventDefault();
 		e.stopPropagation();
 		try {
-			await hostListingsStore.unarchive(listing.id);
-			toast.success('Объявление опубликовано');
+			const updated = await hostListingsStore.unarchive(listing.id);
+			if (updated?.status === 'pending_review' || updated?.status === 'awaiting_company_verification') {
+				toast.success('Объявление отправлено на модерацию');
+			} else {
+				toast.success('Объявление опубликовано');
+			}
 		} catch (err: any) {
-			toast.error('Ошибка', err?.message || 'Не удалось опубликовать объявление');
+			toast.error('Ошибка', err?.message || 'Не удалось восстановить объявление');
 		}
 	}
 
@@ -398,6 +418,7 @@
 								onArchive={handleArchiveListing}
 								onUnarchive={handleUnarchiveListing}
 								onVerify={openVerificationModal}
+								onShowFeedback={openFeedbackModal}
 							/>
 						{/each}
 					</div>
@@ -416,6 +437,7 @@
 							onArchive={handleArchiveListing}
 							onUnarchive={handleUnarchiveListing}
 							onVerify={openVerificationModal}
+							onShowFeedback={openFeedbackModal}
 						/>
 					{/each}
 				</div>
@@ -465,6 +487,21 @@
 			onUpdated={async () => {
 				await hostListingsStore.refresh();
 				await loadHostVerificationStatus();
+			}}
+		/>
+	{/if}
+
+	{#if selectedListingForFeedback}
+		<ListingModerationModal
+			open={feedbackModalOpen}
+			listing={selectedListingForFeedback}
+			onClose={closeFeedbackModal}
+			onEdit={(listing) => {
+				const target = listing || selectedListingForFeedback;
+				closeFeedbackModal();
+				if (target?.id) {
+					goto(`/host/listings/${target.id}`);
+				}
 			}}
 		/>
 	{/if}

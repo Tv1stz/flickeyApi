@@ -88,34 +88,7 @@
 	);
 
 	function handleEditAndResubmit() {
-		try {
-			const formValues: Partial<ListingFormValues> = {
-				propertyType: listing.propertyType,
-				title: listing.title,
-				address: listing.address,
-				description: listing.description || '',
-				size: String(listing.area || 50),
-				floor: String(listing.floor || 1),
-				totalFloors: String(listing.totalFloors || 5),
-				maxGuests: String(listing.maxGuests || 2),
-				bedrooms: String(listing.bedrooms || 1),
-				beds: String(listing.beds || 1),
-				bathrooms: String(listing.bathrooms || 1),
-				basePrice: String(listing.pricePerNight || 100),
-				minNights: String(listing.rules?.minNights || 1),
-				checkInFrom: listing.rules?.checkIn || '14:00',
-				checkOutBefore: listing.rules?.checkOut || '12:00',
-				amenities: listing.amenities || [],
-				location: listing.location
-			};
-			if (authStore.user?.id) {
-				saveDraft(authStore.user.id, formValues as any, { step: 2 });
-			}
-			toast.info('Объявление загружено для редактирования', 'Внесите правки и отправьте заново');
-			goto(resolve('/listings/new'));
-		} catch {
-			toast.error('Не удалось загрузить черновик');
-		}
+		goto(`/host/listings/${listing.id}`);
 	}
 </script>
 

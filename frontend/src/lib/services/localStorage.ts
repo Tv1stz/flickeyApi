@@ -1,6 +1,7 @@
 // src/lib/services/localStorage.ts
 
 import type { ParsedAddress } from '$lib/services/geocoding';
+import type { SearchParams, SearchFilters, RecentSearch } from '$lib/components/search/taxonomy';
 
 const RECENT_KEY = 'rental_recent_addresses';
 const GEOCODE_KEY = 'rental_geocode_cache';
@@ -33,6 +34,57 @@ export function saveRecentAddress(addr: ParsedAddress) {
 
 export function clearRecentAddresses() {
 	localStorage.removeItem(RECENT_KEY);
+}
+
+// ─── Недавние поиски ───────────────────────────────────────────────────────────
+
+const RECENT_SEARCHES_KEY = 'flickey_recent_searches';
+const MAX_RECENT_SEARCHES = 5;
+
+export type { RecentSearch };
+
+export function getRecentSearches(): RecentSearch[] {
+	try {
+		const raw = localStorage.getItem(RECENT_SEARCHES_KEY);
+		return raw ? JSON.parse(raw) : [];
+	} catch {
+		return [];
+	}
+}
+
+export function saveRecentSearch(params: SearchParams, filters: SearchFilters) {
+	try {
+		const existing = getRecentSearches();
+		const id = `${params.location}_${params.propertyType}_${params.adults}_${params.children}_${Date.now()}`;
+		const search: RecentSearch = {
+			params: { ...params },
+			filters: { ...filters },
+			timestamp: Date.now(),
+			id
+		};
+		// Убираем дубль если такой же поиск уже есть (по локации и типу)
+		const filtered = existing.filter(
+			(s) => s.params.location !== params.location || s.params.propertyType !== params.propertyType
+		);
+		const updated = [search, ...filtered].slice(0, MAX_RECENT_SEARCHES);
+		localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated));
+	} catch {
+		// localStorage может быть недоступен
+	}
+}
+
+export function clearRecentSearches() {
+	localStorage.removeItem(RECENT_SEARCHES_KEY);
+}
+
+export function deleteRecentSearch(id: string) {
+	try {
+		const existing = getRecentSearches();
+		const updated = existing.filter((s) => s.id !== id);
+		localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated));
+	} catch {
+		// ignore
+	}
 }
 
 // ─── Персистентный кэш геокодинга ─────────────────────────────────────────────

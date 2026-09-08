@@ -116,12 +116,32 @@ func (s *AdminService) ModerateListing(ctx context.Context, admin *db.User, list
 	switch action {
 	case "approve":
 		newStatus = "published"
+		listing.RejectionReason = nil
+		listing.ModerationComment = nil
 	case "reject":
 		newStatus = "rejected"
+		if reason != "" {
+			listing.RejectionReason = &reason
+		}
+		if note != "" {
+			listing.ModerationComment = &note
+		}
 	case "request_changes":
 		newStatus = "changes_requested"
+		if reason != "" {
+			listing.RejectionReason = &reason
+		}
+		if note != "" {
+			listing.ModerationComment = &note
+		}
 	case "suspend":
 		newStatus = "suspended"
+		if reason != "" {
+			listing.RejectionReason = &reason
+		}
+		if note != "" {
+			listing.ModerationComment = &note
+		}
 	default:
 		return nil, fmt.Errorf("invalid moderation action: %s", action)
 	}
@@ -237,6 +257,9 @@ func (s *AdminService) ModerateListing(ctx context.Context, admin *db.User, list
 			_ = db.SaveDraft(ctx, s.DB, pendingDraft)
 		} else if action == "reject" {
 			pendingDraft.Status = "rejected"
+			_ = db.SaveDraft(ctx, s.DB, pendingDraft)
+		} else if action == "request_changes" {
+			pendingDraft.Status = "changes_requested"
 			_ = db.SaveDraft(ctx, s.DB, pendingDraft)
 		}
 	}

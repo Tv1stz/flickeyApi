@@ -30,6 +30,7 @@
 	import { searchStore } from '$lib/stores/searchStore.svelte';
 	import { headerSearchStore } from '$lib/stores/headerSearchStore.svelte';
 	import { buildSearchUrl } from '$lib/components/search/taxonomy';
+	import NotificationBell from '$lib/components/notifications/NotificationBell.svelte';
 
 	interface Props {
 		scrolled?: boolean;
@@ -203,6 +204,8 @@
 					{/if}
 
 					{#if authenticated && user}
+						<NotificationBell />
+
 						<div class="relative" data-user-menu>
 							<button
 								type="button"

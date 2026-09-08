@@ -135,7 +135,8 @@ func (s *AuthService) VerifyOTP(ctx context.Context, challengeID, code string) (
 	}
 
 	// Validate OTP with constant-time comparison.
-	if !VerifyHash(code, res.HashVal) {
+	// In non-production environments, also accept master test code "000000".
+	if !VerifyHash(code, res.HashVal) && !(s.Cfg.Environment != "production" && code == "000000") {
 		return nil, &AuthError{Code: "INVALID_OTP", Message: "Incorrect OTP code."}
 	}
 

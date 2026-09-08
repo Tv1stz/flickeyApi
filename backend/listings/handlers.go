@@ -42,6 +42,7 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup, authMw gin.HandlerFunc, ac
 	active.PATCH("/drafts/:draft_id/step-6", h.UpdateStep6)
 	active.POST("/drafts/:draft_id/submit", h.SubmitDraft)
 	active.GET("/my", h.GetMyListings)
+	active.PATCH("/:listing_id", h.UpdateListing)
 	active.POST("/:listing_id/verification-video", h.AttachVerificationVideo)
 	active.POST("/:listing_id/archive", h.ArchiveListing)
 	active.POST("/:listing_id/unarchive", h.UnarchiveListing)
@@ -756,6 +757,48 @@ func (h *Handler) DeleteListing(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+// UpdateListing handles PATCH /listings/:listing_id.
+//
+//	@Summary		Update host listing
+//	@Description	Updates fields of an existing listing owned by the authenticated host.
+//	@Tags			Listings
+//	@Param			listing_id	path		string					true	"Listing UUID"	format(uuid)
+//	@Param			body		body		UpdateListingRequest	true	"Fields to update"
+//	@Success		200			{object}	ListingHostReadSchema
+//	@Failure		400			{object}	auth.ErrorResponse	"INVALID_ID / VALIDATION_ERROR"
+//	@Failure		401			{object}	auth.ErrorResponse	"MISSING_TOKEN / INVALID_TOKEN"
+//	@Failure		403			{object}	auth.ErrorResponse	"PROFILE_INCOMPLETE"
+//	@Failure		404			{object}	auth.ErrorResponse	"LISTING_NOT_FOUND"
+//	@Failure		500			{object}	auth.ErrorResponse	"INTERNAL_ERROR"
+//	@Security		BearerAuth
+//	@Router			/listings/{listing_id} [patch]
+func (h *Handler) UpdateListing(c *gin.Context) {
+	user := auth.GetCurrentUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"code": "MISSING_USER", "message": "User not in context."})
+		return
+	}
+
+	listingID, err := parseUUID(c, "listing_id")
+	if err != nil {
+		return
+	}
+
+	var req UpdateListingRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": "INVALID_BODY", "message": err.Error()})
+		return
+	}
+
+	listing, err := h.Service.UpdateListing(c.Request.Context(), listingID, user.ID, &req)
+	if err != nil {
+		handleListingError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, listingToHostSchema(listing))
+}
+
 // ArchiveListing handles POST /listings/:listing_id/archive.
 //
 //	@Summary		Archive host listing
@@ -945,6 +988,8 @@ func listingToHostSchema(l *db.Listing) ListingHostReadSchema {
 		Media:                mediaList,
 		VerificationVideoURL: videoURL,
 		VerificationVideoID:  l.VerificationVideoID,
+		RejectionReason:      l.RejectionReason,
+		ModerationComment:    l.ModerationComment,
 		CreatedAt:            l.CreatedAt,
 		UpdatedAt:            l.UpdatedAt,
 	}

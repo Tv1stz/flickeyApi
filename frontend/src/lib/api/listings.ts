@@ -104,6 +104,16 @@ export const listingsApi = {
 	},
 
 	/**
+	 * Update an existing listing owned by authenticated host.
+	 */
+	updateListing(listingId: string, payload: Record<string, any>): Promise<ListingHost> {
+		return apiRequest<ListingHost>(`/listings/${listingId}`, {
+			method: 'PATCH',
+			body: payload
+		});
+	},
+
+	/**
 	 * Step 1: Create a new listing draft with a specified housing type.
 	 */
 	createDraft(payload: CreateDraftRequest): Promise<CreateDraftResponse> {

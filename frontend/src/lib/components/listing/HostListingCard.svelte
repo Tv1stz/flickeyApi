@@ -1,6 +1,6 @@
 <!-- src/lib/components/listing/HostListingCard.svelte -->
 <script lang="ts">
-	import { Trash2, Pencil, Archive, ArchiveRestore, ShieldCheck, Video } from 'lucide-svelte';
+	import { Trash2, Pencil, Archive, ArchiveRestore, ShieldCheck, Video, AlertTriangle } from 'lucide-svelte';
 	import type { Listing } from '$lib/components/card/types';
 	import { PROPERTY_TYPE_LABELS } from '$lib/components/card/types';
 	import { formatBYN } from '$lib/utils/format';
@@ -19,6 +19,7 @@
 		onArchive?: (e: MouseEvent, listing: Listing) => void;
 		onUnarchive?: (e: MouseEvent, listing: Listing) => void;
 		onVerify?: (e: MouseEvent, listing: Listing) => void;
+		onShowFeedback?: (e: MouseEvent, listing: Listing) => void;
 	}
 
 	let {
@@ -29,7 +30,8 @@
 		onEdit,
 		onArchive,
 		onUnarchive,
-		onVerify
+		onVerify,
+		onShowFeedback
 	}: Props = $props();
 
 	const fullAddress = $derived(formatListingAddressFull(listing.address, listing.location));
@@ -38,6 +40,15 @@
 		(listing.status === 'draft' || listing.status === 'draft_video_required') && !hasVideo
 	);
 	const effectiveStatus = $derived(isDraftNeedsVideo ? 'draft_video_required' : listing.status);
+	const hasFeedback = $derived(
+		listing.status === 'changes_requested' || listing.status === 'rejected' || listing.status === 'suspended'
+	);
+	const feedbackLabel = $derived.by(() => {
+		if (listing.status === 'changes_requested') return 'Замечания модератора';
+		if (listing.status === 'rejected') return 'Причина отклонения';
+		if (listing.status === 'suspended') return 'Причина блокировки';
+		return 'Замечания модератора';
+	});
 
 	function handleCardKeydown(e: KeyboardEvent): void {
 		if (e.key === 'Enter' || e.key === ' ') {
@@ -74,6 +85,22 @@
 				</p>
 				<div class="mt-1.5 flex flex-wrap items-center gap-2">
 					<StatusIndicator status={effectiveStatus} active={listing.isActive} />
+					{#if hasFeedback && onShowFeedback}
+						<button
+							type="button"
+							class="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold transition-colors cursor-pointer
+							       {listing.status === 'changes_requested'
+								? 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100'
+								: 'border-rose-300 bg-rose-50 text-rose-800 hover:bg-rose-100'}"
+							onclick={(e) => {
+								e.stopPropagation();
+								onShowFeedback?.(e, listing);
+							}}
+						>
+							<AlertTriangle size={11} class={listing.status === 'changes_requested' ? 'text-amber-600' : 'text-rose-600'} />
+							<span>{listing.status === 'changes_requested' ? 'Замечания' : 'Причина'}</span>
+						</button>
+					{/if}
 					{#if (listing.status === 'draft' || listing.status === 'draft_video_required' || !hasVideo) && onVerify}
 						<button
 							type="button"
@@ -102,13 +129,14 @@
 						onclick={(e) => onEdit?.(e, listing)}
 					/>
 				{/if}
-				{#if listing.status === 'archived' && onUnarchive}
+				{#if (listing.status === 'archived' || listing.status === 'draft') && onUnarchive}
 					<IconActionButton
 						icon={ArchiveRestore}
-						ariaLabel="Опубликовать (разархивировать)"
+						ariaLabel={listing.status === 'draft' ? 'Отправить на модерацию' : 'Опубликовать (разархивировать)'}
+						tooltip={listing.status === 'draft' ? 'Отправить на модерацию' : 'Опубликовать'}
 						onclick={(e) => onUnarchive?.(e, listing)}
 					/>
-				{:else if onArchive}
+				{:else if listing.status !== 'draft' && onArchive}
 					<IconActionButton
 						icon={Archive}
 						ariaLabel="В архив"
@@ -157,6 +185,23 @@
 
 			<div class="flex flex-col items-start gap-1.5 min-w-0">
 				<StatusIndicator status={effectiveStatus} active={listing.isActive} size="sm" />
+				{#if hasFeedback && onShowFeedback}
+					<button
+						type="button"
+						class="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors cursor-pointer shadow-2xs
+						       {listing.status === 'changes_requested'
+							? 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 hover:border-amber-400'
+							: 'border-rose-300 bg-rose-50 text-rose-800 hover:bg-rose-100 hover:border-rose-400'}"
+						onclick={(e) => {
+							e.stopPropagation();
+							onShowFeedback?.(e, listing);
+						}}
+						title="Посмотреть решение модерации"
+					>
+						<AlertTriangle size={13} class={listing.status === 'changes_requested' ? 'text-amber-600 shrink-0' : 'text-rose-600 shrink-0'} />
+						<span>{feedbackLabel}</span>
+					</button>
+				{/if}
 				{#if (listing.status === 'draft' || listing.status === 'draft_video_required' || !hasVideo) && onVerify}
 					<button
 						type="button"
@@ -183,15 +228,15 @@
 						onclick={(e) => onEdit?.(e, listing)}
 					/>
 				{/if}
-				{#if listing.status === 'archived' && onUnarchive}
+				{#if (listing.status === 'archived' || listing.status === 'draft') && onUnarchive}
 					<IconActionButton
 						icon={ArchiveRestore}
-						ariaLabel="Опубликовать"
-						tooltip="Опубликовать из архива"
+						ariaLabel={listing.status === 'draft' ? 'Отправить на модерацию' : 'Опубликовать'}
+						tooltip={listing.status === 'draft' ? 'Отправить на модерацию' : 'Опубликовать из архива'}
 						elevated={true}
 						onclick={(e) => onUnarchive?.(e, listing)}
 					/>
-				{:else if onArchive}
+				{:else if (listing.status === 'published' || listing.status === 'active') && onArchive}
 					<IconActionButton
 						icon={Archive}
 						ariaLabel="В архив"
@@ -249,15 +294,15 @@
 						onclick={(e) => onEdit?.(e, listing)}
 					/>
 				{/if}
-				{#if listing.status === 'archived' && onUnarchive}
+				{#if (listing.status === 'archived' || listing.status === 'draft') && onUnarchive}
 					<IconActionButton
 						icon={ArchiveRestore}
 						variant="floating"
-						ariaLabel="Опубликовать"
-						tooltip="Опубликовать из архива"
+						ariaLabel={listing.status === 'draft' ? 'Отправить на модерацию' : 'Опубликовать'}
+						tooltip={listing.status === 'draft' ? 'Отправить на модерацию' : 'Опубликовать из архива'}
 						onclick={(e) => onUnarchive?.(e, listing)}
 					/>
-				{:else if onArchive}
+				{:else if (listing.status === 'published' || listing.status === 'active') && onArchive}
 					<IconActionButton
 						icon={Archive}
 						variant="floating"
@@ -292,6 +337,25 @@
 				{formatBYN(listing.pricePerNight)}
 				<span class="text-xs font-normal text-zinc-400"> / ночь</span>
 			</p>
+
+			{#if hasFeedback && onShowFeedback}
+				<div class="mt-3">
+					<button
+						type="button"
+						class="inline-flex w-full items-center justify-center gap-2 rounded-2xl border px-3.5 py-2.5 text-xs font-bold transition hover:shadow-xs active:scale-[0.98] cursor-pointer
+						       {listing.status === 'changes_requested'
+							? 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 hover:border-amber-400'
+							: 'border-rose-300 bg-rose-50 text-rose-800 hover:bg-rose-100 hover:border-rose-400'}"
+						onclick={(e) => {
+							e.stopPropagation();
+							onShowFeedback?.(e, listing);
+						}}
+					>
+						<AlertTriangle size={14} class={listing.status === 'changes_requested' ? 'text-amber-600 shrink-0' : 'text-rose-600 shrink-0'} />
+						<span>{feedbackLabel}</span>
+					</button>
+				</div>
+			{/if}
 
 			{#if (listing.status === 'draft' || listing.status === 'draft_video_required' || !hasVideo) && onVerify}
 				<div class="mt-3">
